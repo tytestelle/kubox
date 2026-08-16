@@ -657,11 +657,14 @@ public class LivePlayActivity extends BaseActivity {
     };
 
     private void showSettingGroup() {
+        debugLog("SHOW_SETTING_GROUP: visibility=" + tvRightSettingLayout.getVisibility());
         if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideChannelListRun);
             mHandler.post(mHideChannelListRun);
         }
-        if (tvRightSettingLayout.getVisibility() == View.INVISIBLE) {
+        // 不能只判断 INVISIBLE。部分 Android/主题初始化后可能是 GONE，
+        // 否则第一次按返回/菜单键会误走隐藏分支，表现为“按了没反应”。
+        if (tvRightSettingLayout.getVisibility() != View.VISIBLE) {
             mHandler.removeCallbacks(mHideSettingLayoutRun);
             mHandler.post(mShowSettingLayoutRun);
         } else {
@@ -674,6 +677,7 @@ public class LivePlayActivity extends BaseActivity {
         @Override
         public void run() {
             tvRightSettingLayout.setVisibility(View.VISIBLE);
+            debugLog("SETTING_LAYOUT_VISIBLE");
             ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tvRightSettingLayout.getLayoutParams();
             params.height = ViewGroup.LayoutParams.MATCH_PARENT;
             tvRightSettingLayout.setLayoutParams(params);
