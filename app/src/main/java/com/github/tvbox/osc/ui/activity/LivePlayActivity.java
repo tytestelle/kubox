@@ -1250,4 +1250,38 @@ public class LivePlayActivity extends BaseActivity {
     
 
     
+
+    private static final String DEBUG_TAG = "Ku9TVBox-LivePlay";
+
+    private void debugLog(String message) {
+        Log.e(DEBUG_TAG, message);
+    }
+
+    private void debugLog(String message, Throwable throwable) {
+        Log.e(DEBUG_TAG, message, throwable);
+    }
+
+    private void installCrashLogger() {
+        try {
+            final Thread.UncaughtExceptionHandler previous =
+                    Thread.getDefaultUncaughtExceptionHandler();
+
+            Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+                Log.e(DEBUG_TAG,
+                        "========== LIVE PLAY CRASH ==========\n"
+                                + "thread=" + thread.getName()
+                                + "\nactivity=" + LivePlayActivity.this.getClass().getName(),
+                        throwable);
+
+                if (previous != null) {
+                    previous.uncaughtException(thread, throwable);
+                }
+            });
+
+            Log.e(DEBUG_TAG, "Crash logger installed");
+        } catch (Throwable t) {
+            Log.e(DEBUG_TAG, "Failed to install crash logger", t);
+        }
+    }
+
 }
