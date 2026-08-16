@@ -1,63 +1,32 @@
 package com.github.tvbox.osc.bean;
 
-import java.util.List;
+import androidx.annotation.NonNull;
+import androidx.room.Entity;
 
-/**
- * epg_data.json 对应的 Bean
- */
+@Entity(tableName = "epg_data", primaryKeys = {"channelName", "date", "idx"})
 public class EpgData {
-    private String name;
-    private String logo;
-    private String url;
-    private String epg;
-    private List<String> alias;
-    private List<EpgProgram> program;
+    @NonNull
+    public String channelName = "";
+    @NonNull
+    public String date = "";
+    public String title = "";
+    public String start = "";
+    public String end = "";
+    public long startTime = 0;
+    public long endTime = 0;
+    public int idx = 0;
 
-    public String getName() {
-        return name;
-    }
+    public EpgData() {}
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getLogo() {
-        return logo;
-    }
-
-    public void setLogo(String logo) {
-        this.logo = logo;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public String getEpg() {
-        return epg;
-    }
-
-    public void setEpg(String epg) {
-        this.epg = epg;
-    }
-
-    public List<String> getAlias() {
-        return alias;
-    }
-
-    public void setAlias(List<String> alias) {
-        this.alias = alias;
-    }
-
-    public List<EpgProgram> getProgram() {
-        return program;
-    }
-
-    public void setProgram(List<EpgProgram> program) {
-        this.program = program;
+    @androidx.room.Ignore
+    public EpgData(String channelName, String date, String title, String start, String end, long startTime, long endTime, int idx) {
+        this.channelName = channelName;
+        this.date = date;
+        this.title = title;
+        this.start = start;
+        this.end = end;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.idx = idx;
     }
 }

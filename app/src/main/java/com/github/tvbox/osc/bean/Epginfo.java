@@ -1,55 +1,54 @@
 package com.github.tvbox.osc.bean;
 
+import com.github.tvbox.osc.util.HawkConfig;
+import com.orhanobut.hawk.Hawk;
+
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.TimeZone;
 
-/**
- * EPG 信息 Bean
- */
 public class Epginfo {
-    private String name;
-    private List<EpgProgram> program;
 
-    // Adapter 需要的公共字段
+    public Date startdateTime;
+    public Date enddateTime;
+    public int datestart;
+    public int dateend;
     public String title;
+    public String originStart;
+    public String originEnd;
     public String start;
     public String end;
     public int index;
-    public String currentEpgDate;
-    public Date startdateTime;
-    public Date enddateTime;
-    public String url;
+    public Date epgDate;
+    public String currentEpgDate = null;
+    SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-    public String getName() {
-        return name;
+    public Epginfo(Date Date,String str, Date date, String str1, String str2,int pos) {
+        epgDate = Date;
+        currentEpgDate = timeFormat.format(epgDate);
+        title = str;
+        originStart = str1;
+        originEnd = str2;
+        index = pos;
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("GMT+8:00"));
+        SimpleDateFormat userSimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
+        userSimpleDateFormat.setTimeZone(TimeZone.getDefault());
+        startdateTime = userSimpleDateFormat.parse(simpleDateFormat.format(date) + " " + str1 + ":00 GMT+8:00", new ParsePosition(0));
+        enddateTime = userSimpleDateFormat.parse(simpleDateFormat.format(date) + " " + str2 + ":00 GMT+8:00", new ParsePosition(0));
+        if (startdateTime != null && enddateTime != null && !enddateTime.after(startdateTime)) {
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(enddateTime);
+            calendar.add(Calendar.DAY_OF_MONTH, 1);
+            enddateTime = calendar.getTime();
+        }
+        SimpleDateFormat zoneFormat = new SimpleDateFormat("HH:mm");
+        start = zoneFormat.format(startdateTime);
+        end = zoneFormat.format(enddateTime);
+        datestart = Integer.parseInt(start.replace(":", ""));
+        dateend = Integer.parseInt(end.replace(":", ""));
     }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public List<EpgProgram> getProgram() {
-        return program;
-    }
-
-    public void setProgram(List<EpgProgram> program) { this.program = program; }
-
-    public String getTitle() {
-        if (title != null) return title;
-        if (program != null && !program.isEmpty()) return program.get(0).getTitle();
-        return "";
-    }
-
-    public String getStartTime() {
-        if (start != null) return start;
-        if (program != null && !program.isEmpty()) return program.get(0).getStartTime();
-        return "";
-    }
-
-    public long getStartTimeL() { return startdateTime == null ? 0L : startdateTime.getTime(); }
-    public long getEndTimeL() { return enddateTime == null ? 0L : enddateTime.getTime(); }
-    public Date getDate() { return startdateTime; }
-    public void setDate(Date date) { this.startdateTime = date; }
-    public String getUrl() { return url; }
-    public void setUrl(String url) { this.url = url; }
 }
