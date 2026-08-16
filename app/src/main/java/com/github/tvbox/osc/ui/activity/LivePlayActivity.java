@@ -30,7 +30,6 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
@@ -115,19 +114,6 @@ import xyz.doikki.videoplayer.player.VideoView;
  * 4. 所有 EPG 操作改为异步，避免主线程阻塞
  */
 public class LivePlayActivity extends BaseActivity {
-
-    // Android 13+ 返回键/返回手势必须通过 OnBackPressedDispatcher 处理。
-    // 电视盒子部分 ROM 不再可靠地走传统 onBackPressed()/KEYCODE_BACK。
-    private void installKu9BackHandler() {
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                debugLog("KU9_BACK_DISPATCHER: handled");
-                handleKu9Back();
-            }
-        });
-    }
-
     public static Context context;
     private VideoView mVideoView;
     private TextView tvChannelInfo;
@@ -259,7 +245,6 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     protected void init() {
-        installKu9BackHandler();
         debugLog("LIVE_INIT_001 init BEGIN");
         try {
             initInternal();
@@ -483,14 +468,10 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
-        debugLog("KU9_BACK_LEGACY: called");
-        handleKu9Back();
-    }
-
-    private void handleKu9Back() {
+        // 酷9交互：直播播放界面按返回键先打开右侧设置菜单，而不是直接退出。
         if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideChannelListRun);
-            tvLeftChannelListLayout.setVisibility(View.INVISIBLE);
+            mHandler.post(mHideChannelListRun);
             return;
         }
         if (ll_epg.getVisibility() == View.VISIBLE) {
@@ -498,39 +479,11 @@ public class LivePlayActivity extends BaseActivity {
             return;
         }
         if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-            hideKu9SettingMenu();
+            mHandler.removeCallbacks(mHideSettingLayoutRun);
+            mHandler.post(mHideSettingLayoutRun);
             return;
         }
-        openKu9SettingMenu();
-    }
-
-    private void openKu9SettingMenu() {
-        debugLog("KU9_MENU_OPEN: groups=" + settingGroupList.size());
-        mHandler.removeCallbacks(mShowSettingLayoutRun);
-        mHandler.removeCallbacks(mHideSettingLayoutRun);
-
-        ViewGroup.LayoutParams lp = tvRightSettingLayout.getLayoutParams();
-        lp.width = dp2px(640);
-        lp.height = ViewGroup.LayoutParams.MATCH_PARENT;
-        tvRightSettingLayout.setLayoutParams(lp);
-        tvRightSettingLayout.setVisibility(View.VISIBLE);
-        tvRightSettingLayout.bringToFront();
-
-        // 首次打开没有直播源时，直接进入“订阅配置”，让用户可以添加直播订阅。
-        int initialGroup = settingGroupList.size() > 5 ? 5 : 0;
-        if (!settingGroupList.isEmpty()) {
-            selectSettingGroup(initialGroup, true);
-            mSettingGroupView.requestFocus();
-        }
-        debugLog("KU9_MENU_VISIBLE: initialGroup=" + initialGroup
-                + ", groupCount=" + settingGroupList.size());
-    }
-
-    private void hideKu9SettingMenu() {
-        mHandler.removeCallbacks(mShowSettingLayoutRun);
-        mHandler.removeCallbacks(mHideSettingLayoutRun);
-        tvRightSettingLayout.setVisibility(View.INVISIBLE);
-        debugLog("KU9_MENU_HIDE");
+        showSettingGroup();
     }
 
     private void hideEpgPanel() {
@@ -574,9 +527,10 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Some TV/box firmwares deliver the physical BACK key directly to onKeyDown
+        // instead of dispatchKeyEvent/onBackPressed.  Keep Ku9's behaviour consistent.
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            debugLog("KU9_BACK_ON_KEYDOWN");
-            handleKu9Back();
+            onBackPressed();
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -590,8 +544,8 @@ public class LivePlayActivity extends BaseActivity {
                     || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
                 showSettingGroup();
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
-                debugLog("KU9_BACK_KEYEVENT: action=DOWN");
-                handleKu9Back();
+                // 酷9：BACK 第一次进入设置菜单；再次 BACK 才关闭菜单。
+                onBackPressed();
                 return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                 if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
@@ -603,7 +557,7 @@ public class LivePlayActivity extends BaseActivity {
                             currentLiveChannelIndex = liveChannelItemAdapter.getItemCount() - 1;
                     }
                     liveChannelItemAdapter.setSelectedChannelIndex(currentLiveChannelIndex);
-                    mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
+                    safeScrollToPosition(mLiveChannelView, currentLiveChannelIndex);
                 } else {
                     if (Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false))
                         playNext();
@@ -616,7 +570,7 @@ public class LivePlayActivity extends BaseActivity {
                     if (currentLiveChannelIndex >= liveChannelItemAdapter.getItemCount())
                         currentLiveChannelIndex = 0;
                     liveChannelItemAdapter.setSelectedChannelIndex(currentLiveChannelIndex);
-                    mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
+                    safeScrollToPosition(mLiveChannelView, currentLiveChannelIndex);
                 } else {
                     if (Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false))
                         playPrevious();
@@ -633,7 +587,7 @@ public class LivePlayActivity extends BaseActivity {
                             currentChannelGroupIndex = liveChannelGroupAdapter.getItemCount() - 1;
                     }
                     liveChannelGroupAdapter.setSelectedGroupIndex(currentChannelGroupIndex);
-                    mChannelGroupView.scrollToPosition(currentChannelGroupIndex);
+                    safeScrollToPosition(mChannelGroupView, currentChannelGroupIndex);
                     loadCurrentChannelGroupChannels();
                 } else {
                     showChannelList();
@@ -644,7 +598,7 @@ public class LivePlayActivity extends BaseActivity {
                     if (currentChannelGroupIndex >= liveChannelGroupAdapter.getItemCount())
                         currentChannelGroupIndex = 0;
                     liveChannelGroupAdapter.setSelectedGroupIndex(currentChannelGroupIndex);
-                    mChannelGroupView.scrollToPosition(currentChannelGroupIndex);
+                    safeScrollToPosition(mChannelGroupView, currentChannelGroupIndex);
                     loadCurrentChannelGroupChannels();
                 } else {
                     showChannelList();
@@ -660,6 +614,19 @@ public class LivePlayActivity extends BaseActivity {
         return super.dispatchKeyEvent(event);
     }
 
+    /**
+     * TvRecyclerView/its SmoothScroller throws IllegalArgumentException for invalid
+     * positions (notably -1 during initial menu setup).  Ku9 opens the settings panel
+     * before a live list is necessarily loaded, so every programmatic scroll must be
+     * range checked.
+     */
+    private void safeScrollToPosition(RecyclerView recyclerView, int position) {
+        if (recyclerView == null || recyclerView.getAdapter() == null) return;
+        int count = recyclerView.getAdapter().getItemCount();
+        if (position < 0 || position >= count) return;
+        recyclerView.scrollToPosition(position);
+    }
+
     private void showChannelList() {
         if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideSettingLayoutRun);
@@ -669,8 +636,8 @@ public class LivePlayActivity extends BaseActivity {
             liveChannelGroupAdapter.setSelectedGroupIndex(currentChannelGroupIndex);
             loadCurrentChannelGroupChannels();
             liveChannelItemAdapter.setSelectedChannelIndex(currentLiveChannelIndex);
-            mChannelGroupView.scrollToPosition(currentChannelGroupIndex);
-            mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
+            safeScrollToPosition(mChannelGroupView, currentChannelGroupIndex);
+            safeScrollToPosition(mLiveChannelView, currentLiveChannelIndex);
             mHandler.postDelayed(mFocusCurrentChannelAndShowChannelList, 50);
         } else {
             mHandler.removeCallbacks(mHideChannelListRun);
@@ -714,11 +681,16 @@ public class LivePlayActivity extends BaseActivity {
     };
 
     private void showSettingGroup() {
-        debugLog("SHOW_SETTING_GROUP");
-        if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-            hideKu9SettingMenu();
+        if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
+            mHandler.removeCallbacks(mHideChannelListRun);
+            mHandler.post(mHideChannelListRun);
+        }
+        if (tvRightSettingLayout.getVisibility() == View.INVISIBLE) {
+            mHandler.removeCallbacks(mHideSettingLayoutRun);
+            mHandler.post(mShowSettingLayoutRun);
         } else {
-            openKu9SettingMenu();
+            mHandler.removeCallbacks(mHideSettingLayoutRun);
+            mHandler.post(mHideSettingLayoutRun);
         }
     }
 
@@ -726,24 +698,20 @@ public class LivePlayActivity extends BaseActivity {
         @Override
         public void run() {
             tvRightSettingLayout.setVisibility(View.VISIBLE);
-            debugLog("SETTING_LAYOUT_VISIBLE");
             ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tvRightSettingLayout.getLayoutParams();
             params.height = ViewGroup.LayoutParams.MATCH_PARENT;
             tvRightSettingLayout.setLayoutParams(params);
-            // RecyclerView 不允许 scrollToPosition(-1)。旧代码这里会直接导致：
-            // IllegalArgumentException: Invalid target position。
-            liveSettingGroupAdapter.setSelectedGroupIndex(-1);
-
-            // 没有直播源时，直接把焦点落到酷9的“订阅配置”，
-            // 用户随后可进入“列表订阅 -> 添加新的直播订阅”。
-            boolean hasLiveSource = !TextUtils.isEmpty(Hawk.get(HawkConfig.LIVE_API_URL, ""))
-                    || (ApiConfig.get().getChannelGroupList() != null
-                    && !ApiConfig.get().getChannelGroupList().isEmpty());
-            int initialGroup = hasLiveSource ? 0 : 5;
-            selectSettingGroup(initialGroup, true);
-
+            if (settingGroupList == null || settingGroupList.isEmpty()) {
+                initLiveSettingList();
+            }
+            if (liveSettingGroupAdapter.getItemCount() > 0) {
+                liveSettingGroupAdapter.setSelectedGroupIndex(0);
+                selectSettingGroup(0, true);
+            }
+            safeScrollToPosition(mSettingGroupView, 0);
+            safeScrollToPosition(mSettingItemView, 0);
             mHandler.removeCallbacks(mHideSettingLayoutRun);
-            // Ku9 设置菜单保持显示，直到再次按返回键关闭。
+            mHandler.postDelayed(mHideSettingLayoutRun, 5000);
         }
     };
 
@@ -1000,9 +968,8 @@ public class LivePlayActivity extends BaseActivity {
     private void initLiveChannelList() {
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list == null || list.isEmpty()) {
-            // 首次进入直播页时没有订阅源是正常状态。酷9不会把“空列表”当成错误，
-            // 用户按返回键进入设置菜单后，再从“订阅配置 -> 列表订阅”添加直播源。
-            debugLog("LIVE_CHANNELS_EMPTY: no live subscription configured yet");
+            debugLog("LIVE_CHANNELS_EMPTY: ApiConfig.get().getChannelGroupList() returned empty; DO NOT finish Activity");
+            Toast.makeText(App.getInstance(), "频道列表为空，请先加载直播源", Toast.LENGTH_SHORT).show();
             liveChannelGroupList.clear();
             liveChannelGroupAdapter.setNewData(liveChannelGroupList);
             if (mChannelGroupView != null) mChannelGroupView.setVisibility(View.VISIBLE);
@@ -1025,7 +992,9 @@ public class LivePlayActivity extends BaseActivity {
         settingGroupList = new ArrayList<>();
 
         ArrayList<LiveSettingItem> lineItems = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
+        int lineCount = (currentLiveChannelItem != null && currentLiveChannelItem.getSourceNum() > 0)
+                ? currentLiveChannelItem.getSourceNum() : 1;
+        for (int i = 0; i < lineCount; i++) {
             LiveSettingItem item = new LiveSettingItem();
             item.setItemName("线路" + (i + 1));
             item.setItemIndex(i);
@@ -1122,7 +1091,7 @@ public class LivePlayActivity extends BaseActivity {
 
         currentChannelGroupIndex = groupIndex;
         liveChannelGroupAdapter.setSelectedGroupIndex(currentChannelGroupIndex);
-        mChannelGroupView.scrollToPosition(currentChannelGroupIndex);
+        safeScrollToPosition(mChannelGroupView, currentChannelGroupIndex);
         if (focus) {
             liveChannelGroupAdapter.setFocusedGroupIndex(currentChannelGroupIndex);
             mHandler.removeCallbacks(mHideChannelListRun);
@@ -1134,7 +1103,7 @@ public class LivePlayActivity extends BaseActivity {
             clickLiveChannel(liveChannelIndex);
         } else {
             if (currentLiveChannelIndex > -1 && currentLiveChannelIndex < liveChannelItemAdapter.getItemCount()) {
-                mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
+                safeScrollToPosition(mLiveChannelView, currentLiveChannelIndex);
                 liveChannelItemAdapter.setSelectedChannelIndex(currentLiveChannelIndex);
             }
         }
@@ -1149,7 +1118,7 @@ public class LivePlayActivity extends BaseActivity {
         if (position < 0 || position >= liveChannelItemAdapter.getItemCount()) return;
         currentLiveChannelIndex = position;
         liveChannelItemAdapter.setSelectedChannelIndex(currentLiveChannelIndex);
-        mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
+        safeScrollToPosition(mLiveChannelView, currentLiveChannelIndex);
 
         currentLiveChannelItem = liveChannelItemAdapter.getItem(currentLiveChannelIndex);
         Hawk.put(HawkConfig.LIVE_CHANNEL, currentLiveChannelItem.getChannelName());
@@ -1330,9 +1299,9 @@ public class LivePlayActivity extends BaseActivity {
         if (focus) {
             liveSettingGroupAdapter.setFocusedGroupIndex(groupIndex);
             mHandler.removeCallbacks(mHideSettingLayoutRun);
-            // Ku9 设置菜单保持显示，直到再次按返回键关闭。
+            mHandler.postDelayed(mHideSettingLayoutRun, 8000);
         }
-        mSettingGroupView.scrollToPosition(groupIndex);
+        safeScrollToPosition(mSettingGroupView, groupIndex);
         List<LiveSettingItem> items = settingGroupList.get(groupIndex).getLiveSettingItems();
         if (items == null || items.isEmpty()) {
             liveSettingItemAdapter.setNewData(new ArrayList<>());
@@ -1397,212 +1366,91 @@ public class LivePlayActivity extends BaseActivity {
         }
     }
 
-    /**
-     * 酷9风格“列表订阅”入口。
-     *
-     * 用户要求：返回键 -> 右侧设置 -> 订阅配置 -> 列表订阅。
-     * 这里不再只保存一个 URL，而是保存“备注 + 地址”的订阅列表，
-     * 同时兼容之前版本只保存 URL 的 LIVE_API_HISTORY。
-     */
     private void showLiveSubscriptionDialog() {
-        final ArrayList<String> records = loadLiveSubscriptionRecords();
-        final ArrayList<String> labels = new ArrayList<>();
-        labels.add("＋ 添加新的直播订阅");
-        for (String record : records) {
-            String[] pair = splitSubscriptionRecord(record);
-            labels.add(pair[0]);
-        }
+        final List<String> history = new ArrayList<>();
+        List<String> saved = Hawk.get(HawkConfig.LIVE_API_HISTORY, new ArrayList<>());
+        if (saved != null) history.addAll(saved);
+        String current = Hawk.get(HawkConfig.LIVE_API_URL, "");
+        if (!TextUtils.isEmpty(current) && !history.contains(current)) history.add(0, current);
 
-        final String currentUrl = Hawk.get(HawkConfig.LIVE_API_URL, "");
-        int checked = -1;
-        for (int i = 0; i < records.size(); i++) {
-            if (currentUrl.equals(splitSubscriptionRecord(records.get(i))[1])) {
-                checked = i + 1;
-                break;
-            }
-        }
-
-        final int selectedChecked = checked;
+        final String[] entries = new String[history.size() + 1];
+        entries[0] = "＋ 添加新的直播订阅";
+        for (int i = 0; i < history.size(); i++) entries[i + 1] = history.get(i);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("列表订阅")
-                .setSingleChoiceItems(labels.toArray(new String[0]), checked, (d, which) -> {
+                .setSingleChoiceItems(entries, -1, (d, which) -> {
                     if (which == 0) {
                         d.dismiss();
                         showLiveSubscriptionInput();
                     } else {
-                        String[] pair = splitSubscriptionRecord(records.get(which - 1));
+                        String url = history.get(which - 1);
                         d.dismiss();
-                        activateLiveSubscription(pair[0], pair[1]);
+                        activateLiveSubscription(url);
                     }
                 })
-                .setNegativeButton("关闭", null)
+                .setNegativeButton("取消", null)
                 .create();
-
-        dialog.setOnShowListener(v -> {
-            if (dialog.getListView() != null) {
-                dialog.getListView().setDivider(null);
-                if (selectedChecked >= 0 && selectedChecked < dialog.getListView().getChildCount()) {
-                    dialog.getListView().getChildAt(selectedChecked).requestFocus();
-                } else if (dialog.getListView().getChildCount() > 0) {
-                    dialog.getListView().getChildAt(0).requestFocus();
-                }
-            }
+        dialog.setOnShowListener(d -> {
+            if (dialog.getListView() != null && dialog.getListView().getChildCount() > 0)
+                dialog.getListView().getChildAt(0).requestFocus();
         });
         dialog.show();
     }
 
-    /** 兼容旧版本：history 只有 URL 时，自动转换成“备注=URL”。 */
-    private ArrayList<String> loadLiveSubscriptionRecords() {
-        ArrayList<String> result = new ArrayList<>();
-        try {
-            List<String> saved = Hawk.get(HawkConfig.LIVE_API_SUBSCRIPTIONS, new ArrayList<String>());
-            if (saved != null) {
-                for (String item : saved) {
-                    if (!TextUtils.isEmpty(item) && !result.contains(item)) result.add(item);
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-
-        // 兼容之前 V5/V6 保存的 URL 历史。
-        try {
-            List<String> history = Hawk.get(HawkConfig.LIVE_API_HISTORY, new ArrayList<String>());
-            if (history != null) {
-                for (String url : history) {
-                    if (TextUtils.isEmpty(url)) continue;
-                    String record = makeSubscriptionRecord(url, url);
-                    boolean exists = false;
-                    for (String old : result) {
-                        if (splitSubscriptionRecord(old)[1].equals(url)) {
-                            exists = true;
-                            break;
-                        }
-                    }
-                    if (!exists) result.add(record);
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return result;
-    }
-
-    private String makeSubscriptionRecord(String name, String url) {
-        JsonObject obj = new JsonObject();
-        obj.addProperty("name", TextUtils.isEmpty(name) ? url : name);
-        obj.addProperty("url", url == null ? "" : url);
-        return obj.toString();
-    }
-
-    private String[] splitSubscriptionRecord(String record) {
-        try {
-            JsonObject obj = new Gson().fromJson(record, JsonObject.class);
-            if (obj != null && obj.has("url")) {
-                String url = obj.get("url").getAsString();
-                String name = obj.has("name") ? obj.get("name").getAsString() : url;
-                return new String[]{TextUtils.isEmpty(name) ? url : name, url};
-            }
-        } catch (Throwable ignored) {
-        }
-        // 旧格式就是 URL。
-        return new String[]{record == null ? "" : record, record == null ? "" : record};
-    }
-
-    private void saveLiveSubscriptionRecord(String name, String url) {
-        ArrayList<String> records = loadLiveSubscriptionRecords();
-        String newRecord = makeSubscriptionRecord(name, url);
-        ArrayList<String> result = new ArrayList<>();
-        result.add(newRecord);
-        for (String old : records) {
-            String[] pair = splitSubscriptionRecord(old);
-            if (!url.equals(pair[1])) result.add(old);
-        }
-        while (result.size() > 30) result.remove(result.size() - 1);
-        Hawk.put(HawkConfig.LIVE_API_SUBSCRIPTIONS, result);
-
-        // 保留旧字段，兼容其它 TVBox 代码。
-        ArrayList<String> history = new ArrayList<>();
-        for (String item : result) {
-            String itemUrl = splitSubscriptionRecord(item)[1];
-            if (!TextUtils.isEmpty(itemUrl)) history.add(itemUrl);
-        }
-        Hawk.put(HawkConfig.LIVE_API_HISTORY, history);
-    }
-
     private void showLiveSubscriptionInput() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
+        final EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("m3u / m3u8 / txt / json 订阅地址");
+        input.setText(Hawk.get(HawkConfig.LIVE_API_URL, ""));
+        input.setSelectAllOnFocus(false);
         int pad = dp2px(20);
-        box.setPadding(pad, 0, pad, 0);
-
-        EditText nameInput = new EditText(this);
-        nameInput.setSingleLine(true);
-        nameInput.setHint("订阅备注，例如：我的直播源");
-        box.addView(nameInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp2px(52)));
-
-        EditText urlInput = new EditText(this);
-        urlInput.setSingleLine(true);
-        urlInput.setHint("直播源地址（m3u / m3u8 / txt / json）");
-        box.addView(urlInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp2px(60)));
-
-        String current = Hawk.get(HawkConfig.LIVE_API_URL, "");
-        if (!TextUtils.isEmpty(current)) {
-            urlInput.setText(current);
-            urlInput.setSelection(urlInput.length());
-        }
-
+        input.setPadding(pad, pad / 2, pad, pad / 2);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("添加直播订阅")
-                .setView(box)
-                .setPositiveButton("确定", null)
+                .setView(input)
+                .setPositiveButton("加载", null)
                 .setNegativeButton("取消", null)
                 .create();
-
         dialog.setOnShowListener(v -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(btn -> {
-            String name = nameInput.getText().toString().trim();
-            String url = urlInput.getText().toString().trim();
-            if (TextUtils.isEmpty(url)) {
-                urlInput.setError("请输入直播源地址");
-                urlInput.requestFocus();
+            String url = input.getText().toString().trim();
+            if (url.isEmpty()) {
+                input.setError("请输入订阅地址");
                 return;
             }
-            if (TextUtils.isEmpty(name)) name = url;
             dialog.dismiss();
-            activateLiveSubscription(name, url);
+            activateLiveSubscription(url);
         }));
+        dialog.getWindow();
         dialog.show();
     }
 
-    private void activateLiveSubscription(final String name, final String url) {
-        if (TextUtils.isEmpty(url)) return;
-
-        saveLiveSubscriptionRecord(name, url);
+    private void activateLiveSubscription(final String url) {
         Hawk.put(HawkConfig.LIVE_API_URL, url);
+        List<String> history = Hawk.get(HawkConfig.LIVE_API_HISTORY, new ArrayList<>());
+        if (history == null) history = new ArrayList<>();
+        history.remove(url);
+        history.add(0, url);
+        if (history.size() > 20) history = new ArrayList<>(history.subList(0, 20));
+        Hawk.put(HawkConfig.LIVE_API_HISTORY, history);
 
         Toast.makeText(this, "正在加载直播订阅…", Toast.LENGTH_SHORT).show();
-        debugLog("LIVE_SUBSCRIBE_LOAD: name=" + name + " url=" + url);
+        debugLog("LIVE_SUBSCRIBE_LOAD: " + url);
         ApiConfig.get().loadLiveConfig(false, new ApiConfig.LoadConfigCallback() {
             @Override public void success() {
                 runOnUiThread(() -> {
-                    List<LiveChannelGroup> groups = ApiConfig.get().getChannelGroupList();
-                    int count = groups == null ? 0 : groups.size();
-                    debugLog("LIVE_SUBSCRIBE_SUCCESS: groups=" + count);
+                    debugLog("LIVE_SUBSCRIBE_SUCCESS: groups=" + ApiConfig.get().getChannelGroupList().size());
                     initLiveChannelList();
-                    Toast.makeText(LivePlayActivity.this,
-                            count > 0 ? "直播订阅加载成功" : "订阅已加载，但没有解析到频道",
-                            Toast.LENGTH_SHORT).show();
+                    Toast.makeText(LivePlayActivity.this, "直播订阅加载成功", Toast.LENGTH_SHORT).show();
                     mHandler.removeCallbacks(mHideSettingLayoutRun);
                     mHandler.post(mHideSettingLayoutRun);
-                    if (count > 0) showChannelList();
+                    showChannelList();
                 });
             }
             @Override public void error(String msg) {
                 runOnUiThread(() -> {
                     debugLog("LIVE_SUBSCRIBE_ERROR: " + msg);
-                    Toast.makeText(LivePlayActivity.this,
-                            "直播订阅加载失败：" + msg, Toast.LENGTH_LONG).show();
+                    Toast.makeText(LivePlayActivity.this, "直播订阅加载失败：" + msg, Toast.LENGTH_LONG).show();
                 });
             }
             @Override public void notice(String msg) {
