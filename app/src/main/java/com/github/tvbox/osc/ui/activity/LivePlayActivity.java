@@ -85,6 +85,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.net.URLEncoder;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -223,12 +224,35 @@ public class LivePlayActivity extends BaseActivity {
     private static final String TAG = "LivePlay";
 
     @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        debugLog("LIVE_CREATE_001 onCreate BEGIN");
+        try {
+            super.onCreate(savedInstanceState);
+            debugLog("LIVE_CREATE_002 onCreate END");
+        } catch (Throwable t) {
+            debugLog("LIVE_CREATE_CRASH onCreate", t);
+            throw t;
+        }
+    }
+
+    @Override
     protected int getLayoutResID() {
         return R.layout.activity_live_play;
     }
 
     @Override
     protected void init() {
+        debugLog("LIVE_INIT_001 init BEGIN");
+        try {
+            initInternal();
+            debugLog("LIVE_INIT_999 init END");
+        } catch (Throwable t) {
+            debugLog("LIVE_INIT_CRASH init", t);
+            throw t;
+        }
+    }
+
+    private void initInternal() {
         context = this;
         // ========== 修复2: Hawk.get 做空值防护 ==========
         String rawEpg = Hawk.get(HawkConfig.EPG_URL, "");
@@ -445,18 +469,23 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     protected void onResume() {
+        debugLog("LIVE_RESUME_BEGIN");
         super.onResume();
+        debugLog("LIVE_RESUME_END");
         if (mVideoView != null) mVideoView.resume();
     }
 
     @Override
     protected void onPause() {
+        debugLog("LIVE_PAUSE_BEGIN");
         super.onPause();
+        debugLog("LIVE_PAUSE_END");
         if (mVideoView != null) mVideoView.pause();
     }
 
     @Override
     protected void onDestroy() {
+        debugLog("LIVE_DESTROY_BEGIN");
         super.onDestroy();
         if (mVideoView != null) {
             mVideoView.release();
@@ -465,6 +494,7 @@ public class LivePlayActivity extends BaseActivity {
         if (epgExecutor != null && !epgExecutor.isShutdown()) {
             epgExecutor.shutdown();
         }
+        debugLog("LIVE_DESTROY_END");
     }
 
     @Override
@@ -889,9 +919,13 @@ public class LivePlayActivity extends BaseActivity {
 
     private void initLiveChannelList() {
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
-        if (list.isEmpty()) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-            finish();
+        if (list == null || list.isEmpty()) {
+            debugLog("LIVE_CHANNELS_EMPTY: ApiConfig.get().getChannelGroupList() returned empty; DO NOT finish Activity");
+            Toast.makeText(App.getInstance(), "频道列表为空，请先加载直播源", Toast.LENGTH_SHORT).show();
+            liveChannelGroupList.clear();
+            liveChannelGroupAdapter.setNewData(liveChannelGroupList);
+            if (mChannelGroupView != null) mChannelGroupView.setVisibility(View.VISIBLE);
+            if (mLiveChannelView != null) mLiveChannelView.setVisibility(View.VISIBLE);
             return;
         }
 

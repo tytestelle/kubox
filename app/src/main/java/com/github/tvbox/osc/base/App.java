@@ -50,7 +50,7 @@ public class App extends MultiDexApplication {
         instance = this;
 
         // V4 diagnostic logger: a NEW filename is used so it cannot be confused with an old APK.
-        writeV4("=== KU9 DEBUG V4 APK STARTED ===");
+        writeV4("=== KU9 DEBUG V5 APK STARTED ===");
         writeV4("time=" + new java.util.Date());
         writeV4("package=" + getPackageName());
         writeV4("process=" + android.os.Process.myPid());
@@ -126,7 +126,7 @@ public class App extends MultiDexApplication {
         for (File dir : dirs) {
             try {
                 if (!dir.exists() && !dir.mkdirs()) continue;
-                File f = new File(dir, "ku9_debug_v4.log");
+                File f = new File(dir, "ku9_debug_v5.log");
                 FileWriter fw = new FileWriter(f, true);
                 fw.write(content);
                 fw.flush();
@@ -134,7 +134,7 @@ public class App extends MultiDexApplication {
             } catch (Throwable ignored) {}
         }
         try {
-            File f = new File(getFilesDir(), "ku9_debug_v4.log");
+            File f = new File(getFilesDir(), "ku9_debug_v5.log");
             FileWriter fw = new FileWriter(f, true);
             fw.write(content);
             fw.close();

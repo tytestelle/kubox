@@ -9,3 +9,6 @@
 
 如果仍然只看到旧 ku9_crash.log，而没有 ku9_debug_v4.log，
 说明设备运行的不是这个 APK（例如旧 APK 未覆盖安装）。
+
+
+V5: LivePlayActivity lifecycle diagnostics enabled; empty channel list no longer calls finish(); FileWriter import fixed.
