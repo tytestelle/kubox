@@ -48,6 +48,7 @@ public class App extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        writeCrashLogToDevice("APP STARTED: " + new java.util.Date().toString());
 
         // 全局异常捕获，防止闪退时看不到日志
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
@@ -57,17 +58,8 @@ public class App extends MultiDexApplication {
                 PrintWriter pw = new PrintWriter(sw);
                 throwable.printStackTrace(pw);
                 String crashLog = sw.toString();
-
-                // 写入内部存储的crash.log
-                try {
-                    File crashFile = new File(getFilesDir(), "crash.log");
-                    FileWriter fw = new FileWriter(crashFile, true);
-                    fw.write("\n===== " + new java.util.Date().toString() + " =====\n");
-                    fw.write(crashLog);
-                    fw.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                // 写入多个设备可见位置，避免不同盒子/系统的存储路径差异
+                writeCrashLogToDevice(crashLog);
 
                 // 同时输出到系统日志
                 LOG.e("APP_CRASH: " + crashLog);
@@ -111,6 +103,30 @@ public class App extends MultiDexApplication {
         safeInit("PlayerHelper", new Runnable() { @Override public void run() { PlayerHelper.init(); } });
         safeInit("QuickJSLoader", new Runnable() { @Override public void run() { QuickJSLoader.init(); } });
         safeInit("cleanPlayerCache", new Runnable() { @Override public void run() { FileUtils.cleanPlayerCache(); } });
+    }
+
+
+    private void writeCrashLogToDevice(String crashLog) {
+        String stamp = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                .format(new java.util.Date());
+        String content = "\n===== " + stamp + " =====\n" + crashLog + "\n";
+        File[] targets = new File[] {
+                new File("/sdcard/Ku9TVBox/ku9_crash.log"),
+                new File("/sdcard/Download/Ku9TVBox/ku9_crash.log"),
+                new File(getExternalFilesDir(null), "Ku9TVBox/ku9_crash.log"),
+                new File(getFilesDir(), "ku9_crash.log")
+        };
+        for (File file : targets) {
+            try {
+                File parent = file.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+                FileWriter fw = new FileWriter(file, true);
+                fw.write(content);
+                fw.flush();
+                fw.close();
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     private void ensureExternalDirs() {
