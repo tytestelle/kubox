@@ -1255,10 +1255,24 @@ public class LivePlayActivity extends BaseActivity {
 
     private void debugLog(String message) {
         Log.e(DEBUG_TAG, message);
+        try { writeDeviceDebugLog(message, null); } catch (Throwable ignored) {}
     }
 
     private void debugLog(String message, Throwable throwable) {
         Log.e(DEBUG_TAG, message, throwable);
+        try { writeDeviceDebugLog(message, throwable); } catch (Throwable ignored) {}
+    }
+
+    private void writeDeviceDebugLog(String message, Throwable throwable) {
+        try {
+            File dir = new File("/sdcard/Ku9TVBox");
+            if (!dir.exists()) dir.mkdirs();
+            File file = new File(dir, "ku9_crash.log");
+            FileWriter fw = new FileWriter(file, true);
+            fw.write("\n===== " + new java.util.Date() + " =====\n" + message + "\n");
+            if (throwable != null) fw.write(android.util.Log.getStackTraceString(throwable) + "\n");
+            fw.close();
+        } catch (Throwable ignored) {}
     }
 
     private void installCrashLogger() {

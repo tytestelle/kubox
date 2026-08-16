@@ -1,0 +1,11 @@
+这是 V4 诊断项目。
+安装后必须出现全新的文件（不是旧 ku9_crash.log）：
+
+内部存储/Ku9TVBox/ku9_debug_v4.log
+内部存储/Download/Ku9TVBox/ku9_debug_v4.log
+
+第一行应为：
+=== KU9 DEBUG V4 APK STARTED ===
+
+如果仍然只看到旧 ku9_crash.log，而没有 ku9_debug_v4.log，
+说明设备运行的不是这个 APK（例如旧 APK 未覆盖安装）。
