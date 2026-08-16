@@ -62,4 +62,14 @@
     <color name="dialog_input_bg">#66353744</color>
     <color name="dialog_text_primary">#FFFFFFFF</color>
     <color name="dialog_text_hint">#80FFFFFF</color>
+
+    <!-- Ku9 Live UI compatibility colors -->
+    <color name="color_dialog_drawable_black_85">#D9000000</color>
+    <color name="color_dialog_drawable_black_75">#BF000000</color>
+    <color name="color_dialog_drawable_black_65">#A6000000</color>
+    <color name="color_dialog_drawable_black_55">#8C000000</color>
+    <color name="color_FFFFFF_15">#26FFFFFF</color>
+    <color name="color_FFFFFF_70">#B3FFFFFF</color>
+    <color name="color_FFFFFF_80">#CCFFFFFF</color>
+    <color name="color_3D3D3D_50">#803D3D3D</color>
 </resources>

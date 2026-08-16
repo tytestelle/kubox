@@ -3,29 +3,29 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:padding="12dp"
+    android:gravity="center"
+    android:minHeight="52dp"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
     android:background="@drawable/item_bg_selector_left">
-
     <TextView
         android:id="@+id/tvChannelGroupName"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:textColor="#FFFFFFFF"
-        android:textSize="16sp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:textColor="@android:color/white"
+        android:textSize="17sp"
         android:singleLine="true"
         android:ellipsize="end" />
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
     <TextView
         android:id="@+id/tvGroupCount"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#80FFFFFF"
+        android:layout_marginStart="6dp"
+        android:textColor="@color/color_FFFFFF_50"
         android:textSize="12sp"
         android:singleLine="true" />
 </LinearLayout>

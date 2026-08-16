@@ -48,71 +48,100 @@ public class App extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
         instance = this;
-        EpgUtil.init();
 
-        // 全局异常捕获，防止闪退时看不到日志
+        // V4 diagnostic logger: a NEW filename is used so it cannot be confused with an old APK.
+        writeV4("=== KU9 DEBUG V5 APK STARTED ===");
+        writeV4("time=" + new java.util.Date());
+        writeV4("package=" + getPackageName());
+        writeV4("process=" + android.os.Process.myPid());
+
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-            @Override
-            public void uncaughtException(Thread thread, Throwable throwable) {
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                throwable.printStackTrace(pw);
-                String crashLog = sw.toString();
-
-                // 写入内部存储的crash.log
-                try {
-                    File crashFile = new File(getFilesDir(), "crash.log");
-                    FileWriter fw = new FileWriter(crashFile, true);
-                    fw.write("\n===== " + new java.util.Date().toString() + " =====\n");
-                    fw.write(crashLog);
-                    fw.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                // 同时输出到系统日志
-                LOG.e("APP_CRASH: " + crashLog);
-
-                // 主线程上显示Toast（延迟确保能显示）
-                if (Looper.myLooper() != Looper.getMainLooper()) {
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(App.this, "应用崩溃，请查看 crash.log", Toast.LENGTH_LONG).show();
-                        }
-                    });
-                }
-
-                // 让系统默认处理器也处理（生成系统崩溃日志）
+            @Override public void uncaughtException(Thread thread, Throwable throwable) {
+                writeV4("=== UNCAUGHT EXCEPTION ===");
+                writeV4("thread=" + thread.getName());
+                writeV4(android.util.Log.getStackTraceString(throwable));
                 android.os.Process.killProcess(android.os.Process.myPid());
             }
         });
 
-        // 确保外部存储目录存在，防止某些库写日志时闪退
-        ensureExternalDirs();
+        registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityCreated(Activity a, android.os.Bundle b) {
+                writeV4("ACTIVITY CREATED: " + a.getClass().getName());
+            }
+            @Override public void onActivityStarted(Activity a) {
+                writeV4("ACTIVITY STARTED: " + a.getClass().getName());
+            }
+            @Override public void onActivityResumed(Activity a) {
+                writeV4("ACTIVITY RESUMED: " + a.getClass().getName());
+            }
+            @Override public void onActivityPaused(Activity a) {
+                writeV4("ACTIVITY PAUSED: " + a.getClass().getName());
+            }
+            @Override public void onActivityStopped(Activity a) {
+                writeV4("ACTIVITY STOPPED: " + a.getClass().getName());
+            }
+            @Override public void onActivitySaveInstanceState(Activity a, android.os.Bundle b) {}
+            @Override public void onActivityDestroyed(Activity a) {
+                writeV4("ACTIVITY DESTROYED: " + a.getClass().getName());
+            }
+        });
 
-        // 逐个初始化，每个都加try-catch，防止一个失败导致全部失败
-        safeInit("initParams", new Runnable() { @Override public void run() { initParams(); } });
-        safeInit("OkGoHelper", new Runnable() { @Override public void run() { OkGoHelper.init(); } });
-        safeInit("EpgUtil", new Runnable() { @Override public void run() { EpgUtil.init(); } });
-        safeInit("ControlManager", new Runnable() { @Override public void run() { ControlManager.init(App.this); } });
-        safeInit("AppDataManager", new Runnable() { @Override public void run() { AppDataManager.init(); } });
-        safeInit("LoadSir", new Runnable() { @Override public void run() {
-            LoadSir.beginBuilder()
-                .addCallback(new EmptyCallback())
-                .addCallback(new LoadingCallback())
-                .commit();
+        writeV4("APPLICATION INIT BEGIN");
+        safeInitV4("initParams", new Runnable() { public void run() { initParams(); }});
+        safeInitV4("OkGoHelper", new Runnable() { public void run() { OkGoHelper.init(); }});
+        safeInitV4("EpgUtil", new Runnable() { public void run() { EpgUtil.init(); }});
+        safeInitV4("ControlManager", new Runnable() { public void run() { ControlManager.init(App.this); }});
+        safeInitV4("AppDataManager", new Runnable() { public void run() { AppDataManager.init(); }});
+        safeInitV4("LoadSir", new Runnable() { public void run() {
+            LoadSir.beginBuilder().addCallback(new EmptyCallback()).addCallback(new LoadingCallback()).commit();
         }});
-        safeInit("AutoSizeConfig", new Runnable() { @Override public void run() {
+        safeInitV4("AutoSizeConfig", new Runnable() { public void run() {
             AutoSizeConfig.getInstance().setCustomFragment(true).getUnitsManager()
-                .setSupportDP(false)
-                .setSupportSP(false)
-                .setSupportSubunits(Subunits.MM);
+                    .setSupportDP(false).setSupportSP(false).setSupportSubunits(Subunits.MM);
         }});
-        safeInit("PlayerHelper", new Runnable() { @Override public void run() { PlayerHelper.init(); } });
-        safeInit("QuickJSLoader", new Runnable() { @Override public void run() { QuickJSLoader.init(); } });
-        safeInit("cleanPlayerCache", new Runnable() { @Override public void run() { FileUtils.cleanPlayerCache(); } });
+        safeInitV4("PlayerHelper", new Runnable() { public void run() { PlayerHelper.init(); }});
+        safeInitV4("QuickJSLoader", new Runnable() { public void run() { QuickJSLoader.init(); }});
+        safeInitV4("cleanPlayerCache", new Runnable() { public void run() { FileUtils.cleanPlayerCache(); }});
+        writeV4("=== APPLICATION INIT END ===");
     }
+
+    private void safeInitV4(String name, Runnable r) {
+        writeV4("INIT BEGIN: " + name);
+        try {
+            r.run();
+            writeV4("INIT OK: " + name);
+        } catch (Throwable e) {
+            writeV4("INIT FAILED: " + name + "\n" + android.util.Log.getStackTraceString(e));
+        }
+    }
+
+    private synchronized void writeV4(String message) {
+        String content = "\n===== " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS",
+                java.util.Locale.US).format(new java.util.Date()) + " =====\n" + message + "\n";
+        File[] dirs = new File[] {
+                new File("/sdcard/Ku9TVBox"),
+                new File("/sdcard/Download/Ku9TVBox"),
+                new File("/data/media/0/Ku9TVBox")
+        };
+        for (File dir : dirs) {
+            try {
+                if (!dir.exists() && !dir.mkdirs()) continue;
+                File f = new File(dir, "ku9_debug_v5.log");
+                FileWriter fw = new FileWriter(f, true);
+                fw.write(content);
+                fw.flush();
+                fw.close();
+            } catch (Throwable ignored) {}
+        }
+        try {
+            File f = new File(getFilesDir(), "ku9_debug_v5.log");
+            FileWriter fw = new FileWriter(f, true);
+            fw.write(content);
+            fw.close();
+        } catch (Throwable ignored) {}
+    }
+
+
 
     private void ensureExternalDirs() {
         try {
@@ -161,15 +190,6 @@ public class App extends MultiDexApplication {
         }
     }
 
-    private void safeInit(String name, Runnable runnable) {
-        try {
-            runnable.run();
-        } catch (Throwable t) {
-            LOG.e("Init failed [" + name + "]: " + t.getMessage());
-            t.printStackTrace();
-            // 不抛出，继续初始化其他模块
-        }
-    }
 
     private void initParams() {
         // Hawk
