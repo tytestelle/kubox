@@ -30,6 +30,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
@@ -114,6 +115,19 @@ import xyz.doikki.videoplayer.player.VideoView;
  * 4. 所有 EPG 操作改为异步，避免主线程阻塞
  */
 public class LivePlayActivity extends BaseActivity {
+
+    // Android 13+ 返回键/返回手势必须通过 OnBackPressedDispatcher 处理。
+    // 电视盒子部分 ROM 不再可靠地走传统 onBackPressed()/KEYCODE_BACK。
+    private void installKu9BackHandler() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                debugLog("KU9_BACK_DISPATCHER: handled");
+                handleKu9Back();
+            }
+        });
+    }
+
     public static Context context;
     private VideoView mVideoView;
     private TextView tvChannelInfo;
@@ -245,6 +259,7 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     protected void init() {
+        installKu9BackHandler();
         debugLog("LIVE_INIT_001 init BEGIN");
         try {
             initInternal();
@@ -468,10 +483,14 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
-        // 酷9交互：直播播放界面按返回键先打开右侧设置菜单，而不是直接退出。
+        debugLog("KU9_BACK_LEGACY: called");
+        handleKu9Back();
+    }
+
+    private void handleKu9Back() {
         if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideChannelListRun);
-            mHandler.post(mHideChannelListRun);
+            tvLeftChannelListLayout.setVisibility(View.INVISIBLE);
             return;
         }
         if (ll_epg.getVisibility() == View.VISIBLE) {
@@ -479,11 +498,39 @@ public class LivePlayActivity extends BaseActivity {
             return;
         }
         if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-            mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.post(mHideSettingLayoutRun);
+            hideKu9SettingMenu();
             return;
         }
-        showSettingGroup();
+        openKu9SettingMenu();
+    }
+
+    private void openKu9SettingMenu() {
+        debugLog("KU9_MENU_OPEN: groups=" + settingGroupList.size());
+        mHandler.removeCallbacks(mShowSettingLayoutRun);
+        mHandler.removeCallbacks(mHideSettingLayoutRun);
+
+        ViewGroup.LayoutParams lp = tvRightSettingLayout.getLayoutParams();
+        lp.width = dp2px(640);
+        lp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+        tvRightSettingLayout.setLayoutParams(lp);
+        tvRightSettingLayout.setVisibility(View.VISIBLE);
+        tvRightSettingLayout.bringToFront();
+
+        // 首次打开没有直播源时，直接进入“订阅配置”，让用户可以添加直播订阅。
+        int initialGroup = settingGroupList.size() > 5 ? 5 : 0;
+        if (!settingGroupList.isEmpty()) {
+            selectSettingGroup(initialGroup, true);
+            mSettingGroupView.requestFocus();
+        }
+        debugLog("KU9_MENU_VISIBLE: initialGroup=" + initialGroup
+                + ", groupCount=" + settingGroupList.size());
+    }
+
+    private void hideKu9SettingMenu() {
+        mHandler.removeCallbacks(mShowSettingLayoutRun);
+        mHandler.removeCallbacks(mHideSettingLayoutRun);
+        tvRightSettingLayout.setVisibility(View.INVISIBLE);
+        debugLog("KU9_MENU_HIDE");
     }
 
     private void hideEpgPanel() {
@@ -526,6 +573,16 @@ public class LivePlayActivity extends BaseActivity {
     }
 
     @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            debugLog("KU9_BACK_ON_KEYDOWN");
+            handleKu9Back();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             int keyCode = event.getKeyCode();
@@ -533,8 +590,8 @@ public class LivePlayActivity extends BaseActivity {
                     || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
                 showSettingGroup();
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
-                // 酷9：BACK 第一次进入设置菜单；再次 BACK 才关闭菜单。
-                onBackPressed();
+                debugLog("KU9_BACK_KEYEVENT: action=DOWN");
+                handleKu9Back();
                 return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                 if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
@@ -657,19 +714,11 @@ public class LivePlayActivity extends BaseActivity {
     };
 
     private void showSettingGroup() {
-        debugLog("SHOW_SETTING_GROUP: visibility=" + tvRightSettingLayout.getVisibility());
-        if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
-            mHandler.removeCallbacks(mHideChannelListRun);
-            mHandler.post(mHideChannelListRun);
-        }
-        // 不能只判断 INVISIBLE。部分 Android/主题初始化后可能是 GONE，
-        // 否则第一次按返回/菜单键会误走隐藏分支，表现为“按了没反应”。
-        if (tvRightSettingLayout.getVisibility() != View.VISIBLE) {
-            mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.post(mShowSettingLayoutRun);
+        debugLog("SHOW_SETTING_GROUP");
+        if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
+            hideKu9SettingMenu();
         } else {
-            mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.post(mHideSettingLayoutRun);
+            openKu9SettingMenu();
         }
     }
 
@@ -694,7 +743,7 @@ public class LivePlayActivity extends BaseActivity {
             selectSettingGroup(initialGroup, true);
 
             mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.postDelayed(mHideSettingLayoutRun, 8000);
+            // Ku9 设置菜单保持显示，直到再次按返回键关闭。
         }
     };
 
@@ -1281,7 +1330,7 @@ public class LivePlayActivity extends BaseActivity {
         if (focus) {
             liveSettingGroupAdapter.setFocusedGroupIndex(groupIndex);
             mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.postDelayed(mHideSettingLayoutRun, 8000);
+            // Ku9 设置菜单保持显示，直到再次按返回键关闭。
         }
         mSettingGroupView.scrollToPosition(groupIndex);
         List<LiveSettingItem> items = settingGroupList.get(groupIndex).getLiveSettingItems();
