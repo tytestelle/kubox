@@ -326,7 +326,7 @@ public class LivePlayActivity extends BaseActivity {
         initLiveSettingList();
 
         if (mVideoView != null) {
-            mVideoView.setListener(new VideoView.OnStateChangeListener() {
+            mVideoView.setOnStateChangeListener(new VideoView.OnStateChangeListener() {
                 @Override
                 public void onPlayerStateChanged(int playerState) {}
 
@@ -472,7 +472,7 @@ public class LivePlayActivity extends BaseActivity {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             int keyCode = event.getKeyCode();
             if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
-                    || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTING) {
+                    || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
                 showSettingGroup();
             } else if (!isBack && keyCode == KeyEvent.KEYCODE_BACK) {
                 if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
