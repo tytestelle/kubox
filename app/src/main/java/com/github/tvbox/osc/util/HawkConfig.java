@@ -19,6 +19,7 @@ public class HawkConfig {
     public static final String LIVE_GROUP_LIST = "live_group_list";
     public static final String LIVE_API_URL = "live_api_url";        // 直播订阅地址
     public static final String LIVE_API_HISTORY = "live_api_history"; // 直播订阅历史
+    public static final String LIVE_API_SUBSCRIPTIONS = "live_api_subscriptions"; // 酷9风格：备注+地址订阅列表
     public static final String LIVE_WEB_HEADER = "live_web_header";
     public static final String DEFAULT_LOAD_LIVE = "DEFAULT_LOAD_LIVE";
     public static final String EPG_URL = "epg_url";

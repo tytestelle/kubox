@@ -19,6 +19,9 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
+import android.view.Gravity;
+import android.widget.EditText;
+import android.app.AlertDialog;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -349,6 +352,28 @@ public class LivePlayActivity extends BaseActivity {
         initLiveChannelList();
         initLiveSettingList();
 
+        // 如果没有通过点播配置自动带入直播源，则按酷9的订阅地址直接加载。
+        if (ApiConfig.get().getChannelGroupList() == null || ApiConfig.get().getChannelGroupList().isEmpty()) {
+            String liveUrl = Hawk.get(HawkConfig.LIVE_API_URL, "");
+            if (!TextUtils.isEmpty(liveUrl)) {
+                debugLog("LIVE_AUTO_LOAD: " + liveUrl);
+                ApiConfig.get().loadLiveConfig(true, new ApiConfig.LoadConfigCallback() {
+                    @Override public void success() {
+                        runOnUiThread(() -> {
+                            debugLog("LIVE_AUTO_LOAD_SUCCESS");
+                            initLiveChannelList();
+                        });
+                    }
+                    @Override public void error(String msg) {
+                        debugLog("LIVE_AUTO_LOAD_ERROR: " + msg);
+                    }
+                    @Override public void notice(String msg) {
+                        debugLog("LIVE_AUTO_LOAD_NOTICE: " + msg);
+                    }
+                });
+            }
+        }
+
         if (mVideoView != null) {
             mVideoView.setOnStateChangeListener(new VideoView.OnStateChangeListener() {
                 @Override
@@ -443,19 +468,22 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
+        // 酷9交互：直播播放界面按返回键先打开右侧设置菜单，而不是直接退出。
         if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideChannelListRun);
             mHandler.post(mHideChannelListRun);
-        } else if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
+            return;
+        }
+        if (ll_epg.getVisibility() == View.VISIBLE) {
+            hideEpgPanel();
+            return;
+        }
+        if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideSettingLayoutRun);
             mHandler.post(mHideSettingLayoutRun);
-        } else if (ll_epg.getVisibility() == View.VISIBLE) {
-            hideEpgPanel();
-        } else {
-            mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
-            mHandler.removeCallbacks(mUpdateNetSpeedRun);
-            exit();
+            return;
         }
+        showSettingGroup();
     }
 
     private void hideEpgPanel() {
@@ -504,20 +532,10 @@ public class LivePlayActivity extends BaseActivity {
             if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
                     || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
                 showSettingGroup();
-            } else if (!isBack && keyCode == KeyEvent.KEYCODE_BACK) {
-                if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
-                    mHandler.removeCallbacks(mHideChannelListRun);
-                    mHandler.post(mHideChannelListRun);
-                } else if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-                    mHandler.removeCallbacks(mHideSettingLayoutRun);
-                    mHandler.post(mHideSettingLayoutRun);
-                } else if (ll_epg.getVisibility() == View.VISIBLE) {
-                    hideEpgPanel();
-                } else {
-                    mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
-                    mHandler.removeCallbacks(mUpdateNetSpeedRun);
-                    exit();
-                }
+            } else if (keyCode == KeyEvent.KEYCODE_BACK) {
+                // 酷9：BACK 第一次进入设置菜单；再次 BACK 才关闭菜单。
+                onBackPressed();
+                return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                 if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
                     if (currentLiveChannelIndex < 0) {
@@ -941,44 +959,90 @@ public class LivePlayActivity extends BaseActivity {
     }
 
     private void initLiveSettingList() {
-        ArrayList<LiveSettingItem> liveSettingItem = new ArrayList<>();
-        ArrayList<LiveSettingItem> liveSettingItem2 = new ArrayList<>();
-        ArrayList<LiveSettingItem> liveSettingItem3 = new ArrayList<>();
-        ArrayList<LiveSettingItem> liveSettingItem4 = new ArrayList<>();
-        ArrayList<LiveSettingItem> liveSettingItem5 = new ArrayList<>();
-        ArrayList<LiveSettingItem> LiveSettingItem6 = new ArrayList<>();
-
-        LiveSettingItem item1 = new LiveSettingItem(); item1.setItemName("线路1"); item1.setItemIndex(0); liveSettingItem.add(item1);
-        LiveSettingItem item2 = new LiveSettingItem(); item2.setItemName("线路2"); item2.setItemIndex(1); liveSettingItem.add(item2);
-        LiveSettingItem item3 = new LiveSettingItem(); item3.setItemName("线路3"); item3.setItemIndex(2); liveSettingItem.add(item3);
-
-        LiveSettingItem item2_1 = new LiveSettingItem(); item2_1.setItemName("16:9"); item2_1.setItemIndex(0); liveSettingItem2.add(item2_1);
-        LiveSettingItem item2_2 = new LiveSettingItem(); item2_2.setItemName("4:3"); item2_2.setItemIndex(1); liveSettingItem2.add(item2_2);
-        LiveSettingItem item2_3 = new LiveSettingItem(); item2_3.setItemName("填充"); item2_3.setItemIndex(2); liveSettingItem2.add(item2_3);
-        LiveSettingItem item2_4 = new LiveSettingItem(); item2_4.setItemName("原始"); item2_4.setItemIndex(3); liveSettingItem2.add(item2_4);
-        LiveSettingItem item2_5 = new LiveSettingItem(); item2_5.setItemName("裁剪"); item2_5.setItemIndex(4); liveSettingItem2.add(item2_5);
-
-        LiveSettingItem item3_1 = new LiveSettingItem(); item3_1.setItemName("硬解"); item3_1.setItemIndex(0); liveSettingItem3.add(item3_1);
-        LiveSettingItem item3_2 = new LiveSettingItem(); item3_2.setItemName("软解"); item3_2.setItemIndex(1); liveSettingItem3.add(item3_2);
-
-        LiveSettingItem item4_1 = new LiveSettingItem(); item4_1.setItemName("5s"); item4_1.setItemIndex(0); liveSettingItem4.add(item4_1);
-        LiveSettingItem item4_2 = new LiveSettingItem(); item4_2.setItemName("10s"); item4_2.setItemIndex(1); liveSettingItem4.add(item4_2);
-        LiveSettingItem item4_3 = new LiveSettingItem(); item4_3.setItemName("15s"); item4_3.setItemIndex(2); liveSettingItem4.add(item4_3);
-        LiveSettingItem item4_4 = new LiveSettingItem(); item4_4.setItemName("20s"); item4_4.setItemIndex(3); liveSettingItem4.add(item4_4);
-        LiveSettingItem item4_5 = new LiveSettingItem(); item4_5.setItemName("25s"); item4_5.setItemIndex(4); liveSettingItem4.add(item4_5);
-        LiveSettingItem item4_6 = new LiveSettingItem(); item4_6.setItemName("30s"); item4_6.setItemIndex(5); liveSettingItem4.add(item4_6);
-
-        LiveSettingItem item5_1 = new LiveSettingItem(); item5_1.setItemName("换台反转"); item5_1.setItemIndex(0); liveSettingItem5.add(item5_1);
-        LiveSettingItem item5_2 = new LiveSettingItem(); item5_2.setItemName("跨选分类"); item5_2.setItemIndex(1); liveSettingItem5.add(item5_2);
-        LiveSettingItem item5_3 = new LiveSettingItem(); item5_3.setItemName("超时换源"); item5_3.setItemIndex(2); liveSettingItem5.add(item5_3);
-
         settingGroupList = new ArrayList<>();
-        LiveSettingGroup group1 = new LiveSettingGroup(); group1.setGroupName("线路选择"); group1.setLiveSettingItems(liveSettingItem); settingGroupList.add(group1);
-        LiveSettingGroup group2 = new LiveSettingGroup(); group2.setGroupName("画面比例"); group2.setLiveSettingItems(liveSettingItem2); settingGroupList.add(group2);
-        LiveSettingGroup group3 = new LiveSettingGroup(); group3.setGroupName("播放解码"); group3.setLiveSettingItems(liveSettingItem3); settingGroupList.add(group3);
-        LiveSettingGroup group4 = new LiveSettingGroup(); group4.setGroupName("超时换源"); group4.setLiveSettingItems(liveSettingItem4); settingGroupList.add(group4);
-        LiveSettingGroup group5 = new LiveSettingGroup(); group5.setGroupName("偏好设置"); group5.setLiveSettingItems(liveSettingItem5); settingGroupList.add(group5);
-        LiveSettingGroup group6 = new LiveSettingGroup(); group6.setGroupName("EPG订阅"); group6.setLiveSettingItems(LiveSettingItem6); settingGroupList.add(group6);
+
+        ArrayList<LiveSettingItem> lineItems = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            LiveSettingItem item = new LiveSettingItem();
+            item.setItemName("线路" + (i + 1));
+            item.setItemIndex(i);
+            lineItems.add(item);
+        }
+
+        ArrayList<LiveSettingItem> scaleItems = new ArrayList<>();
+        String[] scales = {"16:9", "4:3", "填充", "原始", "裁剪"};
+        for (int i = 0; i < scales.length; i++) {
+            LiveSettingItem item = new LiveSettingItem();
+            item.setItemName(scales[i]);
+            item.setItemIndex(i);
+            scaleItems.add(item);
+        }
+
+        ArrayList<LiveSettingItem> decoderItems = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            LiveSettingItem item = new LiveSettingItem();
+            item.setItemName(i == 0 ? "硬解" : "软解");
+            item.setItemIndex(i);
+            decoderItems.add(item);
+        }
+
+        ArrayList<LiveSettingItem> timeoutItems = new ArrayList<>();
+        int[] timeout = {5, 10, 15, 20, 25, 30};
+        for (int i = 0; i < timeout.length; i++) {
+            LiveSettingItem item = new LiveSettingItem();
+            item.setItemName(timeout[i] + "s");
+            item.setItemIndex(i);
+            timeoutItems.add(item);
+        }
+
+        ArrayList<LiveSettingItem> preferenceItems = new ArrayList<>();
+        String[] prefs = {"换台反转", "跨选分类", "超时换源"};
+        for (int i = 0; i < prefs.length; i++) {
+            LiveSettingItem item = new LiveSettingItem();
+            item.setItemName(prefs[i]);
+            item.setItemIndex(i);
+            preferenceItems.add(item);
+        }
+
+        ArrayList<LiveSettingItem> subscribeItems = new ArrayList<>();
+        LiveSettingItem listSub = new LiveSettingItem();
+        listSub.setItemName("列表订阅");
+        listSub.setItemIndex(0);
+        subscribeItems.add(listSub);
+        LiveSettingItem epgSub = new LiveSettingItem();
+        epgSub.setItemName("EPG订阅");
+        epgSub.setItemIndex(1);
+        subscribeItems.add(epgSub);
+
+        LiveSettingGroup group1 = new LiveSettingGroup();
+        group1.setGroupName("线路选择");
+        group1.setLiveSettingItems(lineItems);
+        settingGroupList.add(group1);
+
+        LiveSettingGroup group2 = new LiveSettingGroup();
+        group2.setGroupName("画面比例");
+        group2.setLiveSettingItems(scaleItems);
+        settingGroupList.add(group2);
+
+        LiveSettingGroup group3 = new LiveSettingGroup();
+        group3.setGroupName("播放解码");
+        group3.setLiveSettingItems(decoderItems);
+        settingGroupList.add(group3);
+
+        LiveSettingGroup group4 = new LiveSettingGroup();
+        group4.setGroupName("超时换源");
+        group4.setLiveSettingItems(timeoutItems);
+        settingGroupList.add(group4);
+
+        LiveSettingGroup group5 = new LiveSettingGroup();
+        group5.setGroupName("偏好设置");
+        group5.setLiveSettingItems(preferenceItems);
+        settingGroupList.add(group5);
+
+        LiveSettingGroup group6 = new LiveSettingGroup();
+        group6.setGroupName("订阅配置");
+        group6.setLiveSettingItems(subscribeItems);
+        settingGroupList.add(group6);
 
         liveSettingGroupAdapter.setNewData(settingGroupList);
     }
@@ -1197,58 +1261,311 @@ public class LivePlayActivity extends BaseActivity {
         if (focus) {
             liveSettingGroupAdapter.setFocusedGroupIndex(groupIndex);
             mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.postDelayed(mHideSettingLayoutRun, 5000);
+            mHandler.postDelayed(mHideSettingLayoutRun, 8000);
         }
         mSettingGroupView.scrollToPosition(groupIndex);
-        liveSettingItemAdapter.setNewData(settingGroupList.get(groupIndex).getLiveSettingItems());
-        liveSettingItemAdapter.setSelectedItemIndex(settingGroupList.get(groupIndex).getLiveSettingItems().get(0).getItemIndex());
+        List<LiveSettingItem> items = settingGroupList.get(groupIndex).getLiveSettingItems();
+        if (items == null || items.isEmpty()) {
+            liveSettingItemAdapter.setNewData(new ArrayList<>());
+            return;
+        }
+        liveSettingItemAdapter.setNewData(items);
+        liveSettingItemAdapter.setSelectedItemIndex(items.get(0).getItemIndex());
     }
 
-    // ========== 修复9: EPG 订阅点击做空指针防护 ==========
     private void clickSettingItem(int position) {
         if (position < 0 || position >= liveSettingItemAdapter.getItemCount()) return;
-        LiveSettingItem liveSettingItem = liveSettingItemAdapter.getItem(position);
-        if (liveSettingItem == null) return;
+        LiveSettingItem item = liveSettingItemAdapter.getItem(position);
+        if (item == null) return;
+        int group = liveSettingGroupAdapter.getSelectedGroupIndex();
+        if (group < 0 || group >= settingGroupList.size()) return;
 
-        int settingGroupIndex = liveSettingGroupAdapter.getSelectedGroupIndex();
-        if (settingGroupIndex < 0 || settingGroupIndex >= settingGroupList.size()) return;
-
-        if (settingGroupIndex == 5) { // EPG订阅
-            // ========== 修复10: EPG 订阅空值防护 ==========
-            String currentEpg = Hawk.get(HawkConfig.EPG_URL, "");
-            if (currentEpg == null) currentEpg = "";
-            if (currentEpg.equals("默认")) {
-                Toast.makeText(this, "已取消订阅", Toast.LENGTH_SHORT).show();
-                Hawk.put(HawkConfig.EPG_URL, "");
+        if (group == 5) {
+            if (item.getItemIndex() == 0) {
+                showLiveSubscriptionDialog();
             } else {
-                Toast.makeText(this, "已订阅", Toast.LENGTH_SHORT).show();
-                Hawk.put(HawkConfig.EPG_URL, "默认");
-            }
-            // 重新加载EPG
-            if (currentLiveChannelItem != null) {
-                loadEpgDataAsync(currentLiveChannelItem.getChannelName());
+                showEpgSubscriptionDialog();
             }
             return;
         }
 
-        // ... 其他设置项处理保持不变 ...
-        switch (settingGroupIndex) {
-            case 0: // 线路选择
-                // ...
+        switch (group) {
+            case 0:
+                if (currentLiveChannelItem != null && item.getItemIndex() < currentLiveChannelItem.getSourceNum()) {
+                    currentLiveLineIndex = item.getItemIndex();
+                    currentLiveChannelItem.setSourceIndex(currentLiveLineIndex);
+                    playNextSource();
+                }
                 break;
-            case 1: // 画面比例
-                // ...
+            case 1:
+                Hawk.put(HawkConfig.LIVE_PLAY_SCALE, item.getItemIndex());
                 break;
-            case 2: // 播放解码
-                // ...
+            case 2:
+                Hawk.put(HawkConfig.LIVE_PLAY_TYPE, item.getItemIndex());
+                Toast.makeText(this, "已设置：" + item.getItemName(), Toast.LENGTH_SHORT).show();
                 break;
-            case 3: // 超时换源
-                // ...
+            case 3:
+                int[] timeout = {5, 10, 15, 20, 25, 30};
+                if (item.getItemIndex() >= 0 && item.getItemIndex() < timeout.length) {
+                    Hawk.put(HawkConfig.LIVE_CONNECT_TIMEOUT, timeout[item.getItemIndex()]);
+                }
                 break;
-            case 4: // 偏好设置
-                // ...
+            case 4:
+                if (item.getItemIndex() == 0) {
+                    boolean value = !Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false);
+                    Hawk.put(HawkConfig.LIVE_CHANNEL_REVERSE, value);
+                    Toast.makeText(this, value ? "已开启换台反转" : "已关闭换台反转", Toast.LENGTH_SHORT).show();
+                } else if (item.getItemIndex() == 1) {
+                    boolean value = !Hawk.get(HawkConfig.LIVE_CROSS_GROUP, false);
+                    Hawk.put(HawkConfig.LIVE_CROSS_GROUP, value);
+                    Toast.makeText(this, value ? "已开启跨选分类" : "已关闭跨选分类", Toast.LENGTH_SHORT).show();
+                } else {
+                    boolean value = !Hawk.get(HawkConfig.LIVE_CONNECT_TIMEOUT_CHANGE_SOURCE, true);
+                    Hawk.put(HawkConfig.LIVE_CONNECT_TIMEOUT_CHANGE_SOURCE, value);
+                    Toast.makeText(this, value ? "已开启超时换源" : "已关闭超时换源", Toast.LENGTH_SHORT).show();
+                }
                 break;
         }
+    }
+
+    /**
+     * 酷9风格“列表订阅”入口。
+     *
+     * 用户要求：返回键 -> 右侧设置 -> 订阅配置 -> 列表订阅。
+     * 这里不再只保存一个 URL，而是保存“备注 + 地址”的订阅列表，
+     * 同时兼容之前版本只保存 URL 的 LIVE_API_HISTORY。
+     */
+    private void showLiveSubscriptionDialog() {
+        final ArrayList<String> records = loadLiveSubscriptionRecords();
+        final ArrayList<String> labels = new ArrayList<>();
+        labels.add("＋ 添加新的直播订阅");
+        for (String record : records) {
+            String[] pair = splitSubscriptionRecord(record);
+            labels.add(pair[0]);
+        }
+
+        final String currentUrl = Hawk.get(HawkConfig.LIVE_API_URL, "");
+        int checked = -1;
+        for (int i = 0; i < records.size(); i++) {
+            if (currentUrl.equals(splitSubscriptionRecord(records.get(i))[1])) {
+                checked = i + 1;
+                break;
+            }
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("列表订阅")
+                .setSingleChoiceItems(labels.toArray(new String[0]), checked, (d, which) -> {
+                    if (which == 0) {
+                        d.dismiss();
+                        showLiveSubscriptionInput();
+                    } else {
+                        String[] pair = splitSubscriptionRecord(records.get(which - 1));
+                        d.dismiss();
+                        activateLiveSubscription(pair[0], pair[1]);
+                    }
+                })
+                .setNegativeButton("关闭", null)
+                .create();
+
+        dialog.setOnShowListener(v -> {
+            if (dialog.getListView() != null) {
+                dialog.getListView().setDivider(null);
+                if (checked >= 0 && checked < dialog.getListView().getChildCount()) {
+                    dialog.getListView().getChildAt(checked).requestFocus();
+                } else if (dialog.getListView().getChildCount() > 0) {
+                    dialog.getListView().getChildAt(0).requestFocus();
+                }
+            }
+        });
+        dialog.show();
+    }
+
+    /** 兼容旧版本：history 只有 URL 时，自动转换成“备注=URL”。 */
+    private ArrayList<String> loadLiveSubscriptionRecords() {
+        ArrayList<String> result = new ArrayList<>();
+        try {
+            List<String> saved = Hawk.get(HawkConfig.LIVE_API_SUBSCRIPTIONS, new ArrayList<String>());
+            if (saved != null) {
+                for (String item : saved) {
+                    if (!TextUtils.isEmpty(item) && !result.contains(item)) result.add(item);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        // 兼容之前 V5/V6 保存的 URL 历史。
+        try {
+            List<String> history = Hawk.get(HawkConfig.LIVE_API_HISTORY, new ArrayList<String>());
+            if (history != null) {
+                for (String url : history) {
+                    if (TextUtils.isEmpty(url)) continue;
+                    String record = makeSubscriptionRecord(url, url);
+                    boolean exists = false;
+                    for (String old : result) {
+                        if (splitSubscriptionRecord(old)[1].equals(url)) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists) result.add(record);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return result;
+    }
+
+    private String makeSubscriptionRecord(String name, String url) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("name", TextUtils.isEmpty(name) ? url : name);
+        obj.addProperty("url", url == null ? "" : url);
+        return obj.toString();
+    }
+
+    private String[] splitSubscriptionRecord(String record) {
+        try {
+            JsonObject obj = new Gson().fromJson(record, JsonObject.class);
+            if (obj != null && obj.has("url")) {
+                String url = obj.get("url").getAsString();
+                String name = obj.has("name") ? obj.get("name").getAsString() : url;
+                return new String[]{TextUtils.isEmpty(name) ? url : name, url};
+            }
+        } catch (Throwable ignored) {
+        }
+        // 旧格式就是 URL。
+        return new String[]{record == null ? "" : record, record == null ? "" : record};
+    }
+
+    private void saveLiveSubscriptionRecord(String name, String url) {
+        ArrayList<String> records = loadLiveSubscriptionRecords();
+        String newRecord = makeSubscriptionRecord(name, url);
+        ArrayList<String> result = new ArrayList<>();
+        result.add(newRecord);
+        for (String old : records) {
+            String[] pair = splitSubscriptionRecord(old);
+            if (!url.equals(pair[1])) result.add(old);
+        }
+        while (result.size() > 30) result.remove(result.size() - 1);
+        Hawk.put(HawkConfig.LIVE_API_SUBSCRIPTIONS, result);
+
+        // 保留旧字段，兼容其它 TVBox 代码。
+        ArrayList<String> history = new ArrayList<>();
+        for (String item : result) {
+            String itemUrl = splitSubscriptionRecord(item)[1];
+            if (!TextUtils.isEmpty(itemUrl)) history.add(itemUrl);
+        }
+        Hawk.put(HawkConfig.LIVE_API_HISTORY, history);
+    }
+
+    private void showLiveSubscriptionInput() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp2px(20);
+        box.setPadding(pad, 0, pad, 0);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setSingleLine(true);
+        nameInput.setHint("订阅备注，例如：我的直播源");
+        box.addView(nameInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp2px(52)));
+
+        EditText urlInput = new EditText(this);
+        urlInput.setSingleLine(true);
+        urlInput.setHint("直播源地址（m3u / m3u8 / txt / json）");
+        box.addView(urlInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp2px(60)));
+
+        String current = Hawk.get(HawkConfig.LIVE_API_URL, "");
+        if (!TextUtils.isEmpty(current)) {
+            urlInput.setText(current);
+            urlInput.setSelection(urlInput.length());
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("添加直播订阅")
+                .setView(box)
+                .setPositiveButton("确定", null)
+                .setNegativeButton("取消", null)
+                .create();
+
+        dialog.setOnShowListener(v -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(btn -> {
+            String name = nameInput.getText().toString().trim();
+            String url = urlInput.getText().toString().trim();
+            if (TextUtils.isEmpty(url)) {
+                urlInput.setError("请输入直播源地址");
+                urlInput.requestFocus();
+                return;
+            }
+            if (TextUtils.isEmpty(name)) name = url;
+            dialog.dismiss();
+            activateLiveSubscription(name, url);
+        }));
+        dialog.show();
+    }
+
+    private void activateLiveSubscription(final String name, final String url) {
+        if (TextUtils.isEmpty(url)) return;
+
+        saveLiveSubscriptionRecord(name, url);
+        Hawk.put(HawkConfig.LIVE_API_URL, url);
+
+        Toast.makeText(this, "正在加载直播订阅…", Toast.LENGTH_SHORT).show();
+        debugLog("LIVE_SUBSCRIBE_LOAD: name=" + name + " url=" + url);
+        ApiConfig.get().loadLiveConfig(false, new ApiConfig.LoadConfigCallback() {
+            @Override public void success() {
+                runOnUiThread(() -> {
+                    List<LiveChannelGroup> groups = ApiConfig.get().getChannelGroupList();
+                    int count = groups == null ? 0 : groups.size();
+                    debugLog("LIVE_SUBSCRIBE_SUCCESS: groups=" + count);
+                    initLiveChannelList();
+                    Toast.makeText(LivePlayActivity.this,
+                            count > 0 ? "直播订阅加载成功" : "订阅已加载，但没有解析到频道",
+                            Toast.LENGTH_SHORT).show();
+                    mHandler.removeCallbacks(mHideSettingLayoutRun);
+                    mHandler.post(mHideSettingLayoutRun);
+                    if (count > 0) showChannelList();
+                });
+            }
+            @Override public void error(String msg) {
+                runOnUiThread(() -> {
+                    debugLog("LIVE_SUBSCRIBE_ERROR: " + msg);
+                    Toast.makeText(LivePlayActivity.this,
+                            "直播订阅加载失败：" + msg, Toast.LENGTH_LONG).show();
+                });
+            }
+            @Override public void notice(String msg) {
+                debugLog("LIVE_SUBSCRIBE_NOTICE: " + msg);
+            }
+        });
+    }
+
+    private void showEpgSubscriptionDialog() {
+        final EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("XMLTV / EPG 地址");
+        input.setText(Hawk.get(HawkConfig.EPG_URL, ""));
+        int pad = dp2px(20);
+        input.setPadding(pad, pad / 2, pad, pad / 2);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("EPG订阅")
+                .setView(input)
+                .setPositiveButton("保存", (d, w) -> {
+                    String url = input.getText().toString().trim();
+                    Hawk.put(HawkConfig.EPG_URL, url);
+                    List<String> history = Hawk.get(HawkConfig.EPG_HISTORY, new ArrayList<>());
+                    if (history == null) history = new ArrayList<>();
+                    if (!url.isEmpty()) {
+                        history.remove(url);
+                        history.add(0, url);
+                    }
+                    Hawk.put(HawkConfig.EPG_HISTORY, history);
+                    Toast.makeText(this, url.isEmpty() ? "EPG已清除" : "EPG订阅已保存", Toast.LENGTH_SHORT).show();
+                    if (currentLiveChannelItem != null && !url.isEmpty()) loadEpgDataAsync(currentLiveChannelItem.getChannelName());
+                })
+                .setNegativeButton("取消", null)
+                .create();
+        dialog.show();
     }
 
     private void getEpg(Date date) {
