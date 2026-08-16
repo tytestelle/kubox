@@ -677,11 +677,20 @@ public class LivePlayActivity extends BaseActivity {
             ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tvRightSettingLayout.getLayoutParams();
             params.height = ViewGroup.LayoutParams.MATCH_PARENT;
             tvRightSettingLayout.setLayoutParams(params);
+            // RecyclerView 不允许 scrollToPosition(-1)。旧代码这里会直接导致：
+            // IllegalArgumentException: Invalid target position。
             liveSettingGroupAdapter.setSelectedGroupIndex(-1);
-            mSettingGroupView.scrollToPosition(-1);
-            mSettingItemView.scrollToPosition(-1);
+
+            // 没有直播源时，直接把焦点落到酷9的“订阅配置”，
+            // 用户随后可进入“列表订阅 -> 添加新的直播订阅”。
+            boolean hasLiveSource = !TextUtils.isEmpty(Hawk.get(HawkConfig.LIVE_API_URL, ""))
+                    || (ApiConfig.get().getChannelGroupList() != null
+                    && !ApiConfig.get().getChannelGroupList().isEmpty());
+            int initialGroup = hasLiveSource ? 0 : 5;
+            selectSettingGroup(initialGroup, true);
+
             mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.postDelayed(mHideSettingLayoutRun, 5000);
+            mHandler.postDelayed(mHideSettingLayoutRun, 8000);
         }
     };
 
@@ -938,8 +947,9 @@ public class LivePlayActivity extends BaseActivity {
     private void initLiveChannelList() {
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list == null || list.isEmpty()) {
-            debugLog("LIVE_CHANNELS_EMPTY: ApiConfig.get().getChannelGroupList() returned empty; DO NOT finish Activity");
-            Toast.makeText(App.getInstance(), "频道列表为空，请先加载直播源", Toast.LENGTH_SHORT).show();
+            // 首次进入直播页时没有订阅源是正常状态。酷9不会把“空列表”当成错误，
+            // 用户按返回键进入设置菜单后，再从“订阅配置 -> 列表订阅”添加直播源。
+            debugLog("LIVE_CHANNELS_EMPTY: no live subscription configured yet");
             liveChannelGroupList.clear();
             liveChannelGroupAdapter.setNewData(liveChannelGroupList);
             if (mChannelGroupView != null) mChannelGroupView.setVisibility(View.VISIBLE);
@@ -1015,31 +1025,37 @@ public class LivePlayActivity extends BaseActivity {
         subscribeItems.add(epgSub);
 
         LiveSettingGroup group1 = new LiveSettingGroup();
+        group1.setGroupIndex(0);
         group1.setGroupName("线路选择");
         group1.setLiveSettingItems(lineItems);
         settingGroupList.add(group1);
 
         LiveSettingGroup group2 = new LiveSettingGroup();
+        group2.setGroupIndex(1);
         group2.setGroupName("画面比例");
         group2.setLiveSettingItems(scaleItems);
         settingGroupList.add(group2);
 
         LiveSettingGroup group3 = new LiveSettingGroup();
+        group3.setGroupIndex(2);
         group3.setGroupName("播放解码");
         group3.setLiveSettingItems(decoderItems);
         settingGroupList.add(group3);
 
         LiveSettingGroup group4 = new LiveSettingGroup();
+        group4.setGroupIndex(3);
         group4.setGroupName("超时换源");
         group4.setLiveSettingItems(timeoutItems);
         settingGroupList.add(group4);
 
         LiveSettingGroup group5 = new LiveSettingGroup();
+        group5.setGroupIndex(4);
         group5.setGroupName("偏好设置");
         group5.setLiveSettingItems(preferenceItems);
         settingGroupList.add(group5);
 
         LiveSettingGroup group6 = new LiveSettingGroup();
+        group6.setGroupIndex(5);
         group6.setGroupName("订阅配置");
         group6.setLiveSettingItems(subscribeItems);
         settingGroupList.add(group6);
