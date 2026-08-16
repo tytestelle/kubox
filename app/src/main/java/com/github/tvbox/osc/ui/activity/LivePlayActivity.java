@@ -1063,6 +1063,7 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
+        // 返回键只负责关闭当前直播层级；所有菜单都关闭后才退出直播页。
         if (tvRightSettingLayout != null && tvRightSettingLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideSettingLayoutRun);
             mHandler.post(mHideSettingLayoutRun);
@@ -1077,7 +1078,8 @@ public class LivePlayActivity extends BaseActivity {
             backcontroller.setVisibility(View.GONE);
             return;
         }
-        showSettingGroup();
+        exitingLivePlay = true;
+        finish();
     }
 
     private final Runnable mPlaySelectedChannel = new Runnable() {
@@ -1132,6 +1134,17 @@ public class LivePlayActivity extends BaseActivity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
+
+        // 部分电视盒子/遥控器不会把 BACK 可靠地交给 onBackPressed，
+        // 这里统一接管，保证返回键在直播页始终有响应。
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) return true;
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                onBackPressed();
+                return true;
+            }
+        }
+
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (tvLeftChannelListLayout != null && tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
                 if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && isFocusInView(mChannelGroupView)) {
@@ -1281,18 +1294,8 @@ public class LivePlayActivity extends BaseActivity {
         if (liveChannelGroupList == null || liveChannelGroupList.isEmpty()) return;
         if (tvLeftChannelListLayout != null && tvLeftChannelListLayout.getVisibility() == View.INVISIBLE) {
             if (currentLiveLookBackIndex > -1 && mRightEpgList != null) {
-                RecyclerView.Adapter<?> epgAdapter = mRightEpgList.getAdapter();
-                if (epgAdapter != null && currentLiveLookBackIndex >= 0
-                        && currentLiveLookBackIndex < epgAdapter.getItemCount()) {
-                    mRightEpgList.setSelectedPosition(currentLiveLookBackIndex);
-                    mRightEpgList.post(() -> {
-                        RecyclerView.Adapter<?> a = mRightEpgList.getAdapter();
-                        if (a != null && currentLiveLookBackIndex >= 0
-                                && currentLiveLookBackIndex < a.getItemCount()) {
-                            mRightEpgList.smoothScrollToPosition(currentLiveLookBackIndex);
-                        }
-                    });
-                }
+                mRightEpgList.setSelectedPosition(currentLiveLookBackIndex);
+                mRightEpgList.post(() -> mRightEpgList.smoothScrollToPosition(currentLiveLookBackIndex));
             }
             refreshChannelList(currentChannelGroupIndex);
             mHandler.postDelayed(mFocusCurrentChannelAndShowChannelList, 50);
@@ -1311,16 +1314,12 @@ public class LivePlayActivity extends BaseActivity {
             return;
         }
         if (currentLiveChannelIndex > -1 && mLiveChannelView != null) {
-            safeScrollToPosition(mLiveChannelView, currentLiveChannelIndex);
-            if (liveChannelItemAdapter != null && currentLiveChannelIndex < liveChannelItemAdapter.getData().size()) {
-                mLiveChannelView.setSelection(currentLiveChannelIndex);
-            }
+            mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
+            mLiveChannelView.setSelection(currentLiveChannelIndex);
         }
         if (mChannelGroupView != null) {
-            safeScrollToPosition(mChannelGroupView, currentChannelGroupIndex);
-            if (liveChannelGroupAdapter != null && currentChannelGroupIndex < liveChannelGroupAdapter.getData().size()) {
-                mChannelGroupView.setSelection(currentChannelGroupIndex);
-            }
+            mChannelGroupView.scrollToPosition(currentChannelGroupIndex);
+            mChannelGroupView.setSelection(currentChannelGroupIndex);
         }
         mLastChannelGroupIndex = currentChannelGroupIndex;
         mLastChannelList = new ArrayList<>(newChannels != null ? newChannels : new ArrayList<>());
@@ -1385,8 +1384,6 @@ public class LivePlayActivity extends BaseActivity {
 
     private void focusRecyclerPosition(TvRecyclerView recyclerView, int position) {
         if (recyclerView == null || position < 0) return;
-        RecyclerView.Adapter<?> adapter = recyclerView.getAdapter();
-        if (adapter == null || adapter.getItemCount() <= 0 || position >= adapter.getItemCount()) return;
         recyclerView.scrollToPosition(position);
         recyclerView.setSelection(position);
         requestRecyclerItemFocus(recyclerView, position, 0);
@@ -1421,7 +1418,7 @@ public class LivePlayActivity extends BaseActivity {
             int offset = Math.max(0, (mRightEpgList.getHeight() - getResources().getDimensionPixelSize(R.dimen.ts_100)) / 2);
             ((LinearLayoutManager) layoutManager).scrollToPositionWithOffset(position, offset);
         } else {
-            safeScrollToPosition(mRightEpgList, position);
+            mRightEpgList.scrollToPosition(position);
         }
         mRightEpgList.setSelection(position);
         requestRecyclerItemFocus(mRightEpgList, position, 0);
@@ -1851,12 +1848,12 @@ public class LivePlayActivity extends BaseActivity {
             int settingGroupIndex = getDefaultSettingGroupIndex();
             selectSettingGroup(settingGroupIndex, false);
             int settingGroupPosition = liveSettingGroupAdapter != null ? liveSettingGroupAdapter.findPositionByGroupIndex(settingGroupIndex) : 0;
-            if (mSettingGroupView != null) safeScrollToPosition(mSettingGroupView, settingGroupPosition < 0 ? 0 : settingGroupPosition);
+            if (mSettingGroupView != null) mSettingGroupView.scrollToPosition(settingGroupPosition < 0 ? 0 : settingGroupPosition);
             int settingItemIndex = currentLiveChannelItem == null ? 0 : currentLiveChannelItem.getSourceIndex();
             if (liveSettingItemAdapter != null && (liveSettingItemAdapter.getData().isEmpty() || settingItemIndex < 0 || settingItemIndex >= liveSettingItemAdapter.getData().size())) {
                 settingItemIndex = 0;
             }
-            if (mSettingItemView != null) safeScrollToPosition(mSettingItemView, settingItemIndex);
+            if (mSettingItemView != null) mSettingItemView.scrollToPosition(settingItemIndex);
             mHandler.postDelayed(mFocusAndShowSettingGroup, 50);
         } else {
             mHandler.removeCallbacks(mHideSettingLayoutRun);
@@ -2353,7 +2350,7 @@ public class LivePlayActivity extends BaseActivity {
         }
         int scrollToPosition = liveSettingItemAdapter != null ? liveSettingItemAdapter.getSelectedItemIndex() : 0;
         if (scrollToPosition < 0) scrollToPosition = 0;
-        if (mSettingItemView != null) safeScrollToPosition(mSettingItemView, scrollToPosition);
+        if (mSettingItemView != null) mSettingItemView.scrollToPosition(scrollToPosition);
         mHandler.removeCallbacks(mHideSettingLayoutRun);
         mHandler.postDelayed(mHideSettingLayoutRun, postTimeout);
     }
@@ -2841,29 +2838,8 @@ public class LivePlayActivity extends BaseActivity {
     }
 
     private int getDefaultSettingGroupIndex() {
-        // 有正在播放的频道源时优先显示线路切换；没有频道时直接进入“直播订阅”，
-        // 避免空的历史源列表导致设置面板打开后 RecyclerView 滚动到非法位置。
         if (hasCurrentLiveChannelSource()) return 0;
-        if (findSettingGroupByIndex(7) != null) return 7;
-        if (liveSettingGroupList != null && liveSettingGroupList.size() > 6) return 6;
-        return 0;
-    }
-
-    /**
-     * TvRecyclerView.scrollToPosition() 在底层会启动 SmoothScroller，
-     * 当 Adapter 为空或 position 超出范围时会直接抛：
-     * IllegalArgumentException: Invalid target position
-     *
-     * 直播设置面板刚打开时，历史订阅可能为空，因此所有程序化滚动
-     * 都统一经过这个安全入口。
-     */
-    private void safeScrollToPosition(TvRecyclerView recyclerView, int position) {
-        if (recyclerView == null || position < 0) return;
-        RecyclerView.Adapter<?> adapter = recyclerView.getAdapter();
-        if (adapter == null) return;
-        int count = adapter.getItemCount();
-        if (count <= 0 || position >= count) return;
-        recyclerView.scrollToPosition(position);
+        return liveSettingGroupList != null && liveSettingGroupList.size() > 6 ? 6 : 0;
     }
 
     private ArrayList<LiveSettingGroup> getVisibleLiveSettingGroupList() {
@@ -3116,8 +3092,8 @@ public class LivePlayActivity extends BaseActivity {
         loadChannelGroupData(groupIndex);
         if (liveChannelIndex > -1) {
             clickLiveChannel(liveChannelIndex);
-            if (mChannelGroupView != null) safeScrollToPosition(mChannelGroupView, groupIndex);
-            if (mLiveChannelView != null) safeScrollToPosition(mLiveChannelView, liveChannelIndex);
+            if (mChannelGroupView != null) mChannelGroupView.scrollToPosition(groupIndex);
+            if (mLiveChannelView != null) mLiveChannelView.scrollToPosition(liveChannelIndex);
         }
     }
 
@@ -3126,10 +3102,10 @@ public class LivePlayActivity extends BaseActivity {
         if (liveChannelItemAdapter != null) liveChannelItemAdapter.setNewData(channels != null ? channels : new ArrayList<>());
         if (mLiveChannelView != null) {
             if (groupIndex == currentChannelGroupIndex && currentLiveChannelIndex > -1) {
-                safeScrollToPosition(mLiveChannelView, currentLiveChannelIndex);
+                mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
                 liveChannelItemAdapter.setSelectedChannelIndex(currentLiveChannelIndex);
             } else {
-                safeScrollToPosition(mLiveChannelView, 0);
+                mLiveChannelView.scrollToPosition(0);
                 if (liveChannelItemAdapter != null) liveChannelItemAdapter.setSelectedChannelIndex(-1);
             }
         }

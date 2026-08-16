@@ -75,6 +75,7 @@
         android:background="@drawable/bg_ku9_card"
         android:orientation="horizontal"
         android:padding="0dp"
+        android:visibility="invisible"
         android:baselineAligned="false">
 
         <LinearLayout
@@ -280,7 +281,7 @@
         android:background="@drawable/bg_ku9_card"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:visibility="visible">
+        android:visibility="invisible">
 
         <com.owen.tvrecyclerview.widget.TvRecyclerView
             android:id="@+id/mSettingItemView"
