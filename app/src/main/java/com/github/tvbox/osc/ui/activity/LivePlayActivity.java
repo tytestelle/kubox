@@ -131,6 +131,7 @@ public class LivePlayActivity extends BaseActivity {
     private LiveSettingGroupAdapter liveSettingGroupAdapter;
     private LiveSettingItemAdapter liveSettingItemAdapter;
     private List<LiveSettingGroup> settingGroupList = new ArrayList<>();
+    private com.github.tvbox.osc.ui.dialog.Ku9LiveSettingDialog ku9LiveSettingDialog;
 
     public static int currentChannelGroupIndex = 0;
     private Handler mHandler = new Handler(Looper.getMainLooper());
@@ -468,22 +469,52 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
-        // 酷9交互：直播播放界面按返回键先打开右侧设置菜单，而不是直接退出。
-        if (tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
-            mHandler.removeCallbacks(mHideChannelListRun);
-            mHandler.post(mHideChannelListRun);
+        // 直播页的返回键按 Ku9/原 TVBox 直播窗口的交互：弹出设置菜单。
+        // 设置菜单使用真实 Dialog，避免被播放器 SurfaceView 覆盖。
+        if (ku9LiveSettingDialog != null && ku9LiveSettingDialog.isShowing()) {
+            ku9LiveSettingDialog.dismiss();
+            ku9LiveSettingDialog = null;
             return;
         }
-        if (ll_epg.getVisibility() == View.VISIBLE) {
-            hideEpgPanel();
-            return;
-        }
-        if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
-            mHandler.removeCallbacks(mHideSettingLayoutRun);
-            mHandler.post(mHideSettingLayoutRun);
-            return;
-        }
-        showSettingGroup();
+        showKu9SettingsDialog();
+    }
+
+    private void showKu9SettingsDialog() {
+        if (isFinishing()) return;
+        if (ku9LiveSettingDialog != null && ku9LiveSettingDialog.isShowing()) return;
+        ku9LiveSettingDialog = new com.github.tvbox.osc.ui.dialog.Ku9LiveSettingDialog(this,
+                new com.github.tvbox.osc.ui.dialog.Ku9LiveSettingDialog.Callback() {
+                    @Override public void onLiveChanged() {
+                        ApiConfig.get().loadLiveConfig(true, new ApiConfig.LoadConfigCallback() {
+                            @Override public void success() {
+                                runOnUiThread(() -> {
+                                    initLiveChannelList();
+                                    if (ku9LiveSettingDialog != null && ku9LiveSettingDialog.isShowing()) {
+                                        ku9LiveSettingDialog.dismiss();
+                                        ku9LiveSettingDialog = null;
+                                    }
+                                });
+                            }
+                            @Override public void error(String msg) {
+                                debugLog("LIVE_SUB_LOAD_ERROR: " + msg);
+                            }
+                            @Override public void notice(String msg) {
+                                debugLog("LIVE_SUB_LOAD_NOTICE: " + msg);
+                            }
+                        });
+                    }
+                    @Override public void onEpgChanged() {
+                        // EPG 在后台刷新，不阻塞当前视频播放。
+                        mHandler.post(() -> {
+                            if (ku9LiveSettingDialog != null && ku9LiveSettingDialog.isShowing()) {
+                                ku9LiveSettingDialog.dismiss();
+                                ku9LiveSettingDialog = null;
+                            }
+                        });
+                    }
+                });
+        ku9LiveSettingDialog.setOnDismissListener(d -> ku9LiveSettingDialog = null);
+        ku9LiveSettingDialog.show();
     }
 
     private void hideEpgPanel() {
@@ -522,6 +553,10 @@ public class LivePlayActivity extends BaseActivity {
         if (epgExecutor != null && !epgExecutor.isShutdown()) {
             epgExecutor.shutdown();
         }
+        if (ku9LiveSettingDialog != null && ku9LiveSettingDialog.isShowing()) {
+            ku9LiveSettingDialog.dismiss();
+            ku9LiveSettingDialog = null;
+        }
         debugLog("LIVE_DESTROY_END");
     }
 
@@ -529,8 +564,11 @@ public class LivePlayActivity extends BaseActivity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         // Some TV/box firmwares deliver the physical BACK key directly to onKeyDown
         // instead of dispatchKeyEvent/onBackPressed.  Keep Ku9's behaviour consistent.
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            onBackPressed();
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
+                || keyCode == KeyEvent.KEYCODE_SETTINGS || keyCode == KeyEvent.KEYCODE_INFO
+                || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_GUIDE) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) onBackPressed();
+            else showKu9SettingsDialog();
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -540,11 +578,12 @@ public class LivePlayActivity extends BaseActivity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             int keyCode = event.getKeyCode();
-            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
-                    || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
-                showSettingGroup();
+            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_SETTINGS
+                    || keyCode == KeyEvent.KEYCODE_INFO || keyCode == KeyEvent.KEYCODE_HELP
+                    || keyCode == KeyEvent.KEYCODE_GUIDE) {
+                showKu9SettingsDialog();
+                return true;
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
-                // 酷9：BACK 第一次进入设置菜单；再次 BACK 才关闭菜单。
                 onBackPressed();
                 return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
