@@ -1353,6 +1353,8 @@ public class LivePlayActivity extends BaseActivity {
             }
         }
 
+        final int selectedChecked = checked;
+
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("列表订阅")
                 .setSingleChoiceItems(labels.toArray(new String[0]), checked, (d, which) -> {
@@ -1371,8 +1373,8 @@ public class LivePlayActivity extends BaseActivity {
         dialog.setOnShowListener(v -> {
             if (dialog.getListView() != null) {
                 dialog.getListView().setDivider(null);
-                if (checked >= 0 && checked < dialog.getListView().getChildCount()) {
-                    dialog.getListView().getChildAt(checked).requestFocus();
+                if (selectedChecked >= 0 && selectedChecked < dialog.getListView().getChildCount()) {
+                    dialog.getListView().getChildAt(selectedChecked).requestFocus();
                 } else if (dialog.getListView().getChildCount() > 0) {
                     dialog.getListView().getChildAt(0).requestFocus();
                 }
