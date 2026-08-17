@@ -137,24 +137,6 @@
             android:scrollbars="none" />
     </LinearLayout>
 
-    <!-- Ku9 设置按钮：无论遥控器是否提供 KEYCODE_SETTINGS，都可以直接点击打开设置 -->
-    <TextView
-        android:id="@+id/btnKu9Setting"
-        android:layout_width="92dp"
-        android:layout_height="48dp"
-        android:layout_gravity="end|top"
-        android:layout_marginTop="68dp"
-        android:layout_marginEnd="15dp"
-        android:background="@drawable/shape_channelgroup_layout_drawable"
-        android:clickable="true"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:gravity="center"
-        android:text="⚙ 设置"
-        android:textColor="@android:color/white"
-        android:textSize="16sp"
-        android:elevation="30dp" />
-
     <!-- Ku9 风格右上角时间/频道号 -->
     <LinearLayout
         android:id="@+id/tvTimeGroupLayout"

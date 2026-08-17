@@ -48,7 +48,6 @@ public class App extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
         instance = this;
-        EpgUtil.init();
 
         // 全局异常捕获，防止闪退时看不到日志
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
