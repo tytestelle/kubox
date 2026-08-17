@@ -101,7 +101,7 @@ android {
             minifyEnabled false
         }
         release {
-            minifyEnabled false
+            minifyEnabled true
         }
     }
 

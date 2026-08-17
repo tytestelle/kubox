@@ -282,6 +282,17 @@ public class LivePlayActivity extends BaseActivity {
         mChannelGroupView = findViewById(R.id.mGroupGridView);
         mLiveChannelView = findViewById(R.id.mChannelGridView);
         tvRightSettingLayout = findViewById(R.id.tvRightSettingLayout);
+        TextView btnKu9Setting = findViewById(R.id.btnKu9Setting);
+        if (btnKu9Setting != null) {
+            btnKu9Setting.setOnClickListener(v -> {
+                debugLog("KU9_SETTING_BUTTON_CLICK");
+                showSettingGroup();
+            });
+            btnKu9Setting.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) v.setAlpha(1.0f);
+                else v.setAlpha(0.85f);
+            });
+        }
         mSettingGroupView = findViewById(R.id.mSettingGroupView);
         mSettingItemView = findViewById(R.id.mSettingItemView);
         tvChannelInfo = findViewById(R.id.tvChannel);
@@ -430,6 +441,12 @@ public class LivePlayActivity extends BaseActivity {
         }
         tvLeftChannelListLayout.setVisibility(View.INVISIBLE);
 
+        View ku9SettingButton = findViewById(R.id.btnKu9Setting);
+        if (ku9SettingButton != null) {
+            ku9SettingButton.bringToFront();
+            ku9SettingButton.setVisibility(View.VISIBLE);
+        }
+
         if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
             tvRightSettingLayout.setVisibility(View.INVISIBLE);
             tvRightSettingLayout.setLayoutParams(new RelativeLayout.LayoutParams(dp2px(160), dp2px(320)));
@@ -510,6 +527,11 @@ public class LivePlayActivity extends BaseActivity {
         debugLog("KU9_MENU_OPEN: groups=" + settingGroupList.size());
         mHandler.removeCallbacks(mShowSettingLayoutRun);
         mHandler.removeCallbacks(mHideSettingLayoutRun);
+        if (liveSettingGroupAdapter == null || liveSettingItemAdapter == null
+                || mSettingGroupView == null || mSettingItemView == null) {
+            debugLog("KU9_MENU_OPEN_ABORT: setting views not initialized");
+            return;
+        }
 
         ViewGroup.LayoutParams lp = tvRightSettingLayout.getLayoutParams();
         lp.width = dp2px(640);
@@ -591,6 +613,7 @@ public class LivePlayActivity extends BaseActivity {
             if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
                     || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
                 showSettingGroup();
+                return true;
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                 debugLog("KU9_BACK_KEYEVENT: action=DOWN");
                 handleKu9Back();
