@@ -6,7 +6,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/ku9_background">
+    android:background="@drawable/bg_ku9_gradient">
 
     <!-- 视频播放器 -->
     <xyz.doikki.videoplayer.player.VideoView
@@ -15,7 +15,7 @@
         android:layout_height="match_parent" />
 
     <!-- 字幕 -->
-    com.google.android.exoplayer2.ui.SubtitleView
+    <com.google.android.exoplayer2.ui.SubtitleView
         android:id="@+id/mSubtitleView"
         android:layout_width="0dp"
     android:layout_height="0dp" />
@@ -68,6 +68,7 @@
     <!-- 左侧频道列表面板 -->
     <LinearLayout
         android:id="@+id/tvLeftChannnelListLayout"
+        android:visibility="invisible"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="left|center_vertical"
@@ -273,12 +274,12 @@
     <!-- 右侧设置面板 -->
     <LinearLayout
         android:id="@+id/tvRightSettingLayout"
+        android:visibility="invisible"
         android:layout_width="@dimen/vs_640"
         android:layout_height="match_parent"
         android:layout_margin="12dp"
         android:layout_gravity="right"
-        android:background="@drawable/ku9_window_panel"
-        android:elevation="8dp"
+        android:background="@drawable/bg_ku9_card"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:visibility="visible">

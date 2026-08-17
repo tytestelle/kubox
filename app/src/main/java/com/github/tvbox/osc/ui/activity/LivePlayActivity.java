@@ -426,11 +426,11 @@ public class LivePlayActivity extends BaseActivity {
 
         } catch (Exception e) {
             android.util.Log.e("LivePlayActivity", "init error", e);
-            Toast.makeText(this, "直播启动失败，进入主页: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            Intent intent = new Intent(this, HomeActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-            finish();
+            // 直播页是本版本唯一的主界面；初始化异常时不要回到 TVBox 原来的首页。
+            Toast.makeText(this, "直播启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            if (tvLeftChannelListLayout != null) tvLeftChannelListLayout.setVisibility(View.INVISIBLE);
+            if (tvRightSettingLayout != null) tvRightSettingLayout.setVisibility(View.INVISIBLE);
+            if (ll_epg != null) ll_epg.setVisibility(View.VISIBLE);
         }
     }
 
@@ -1151,7 +1151,7 @@ public class LivePlayActivity extends BaseActivity {
                     return true;
                 }
             }
-            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO || keyCode == KeyEvent.KEYCODE_HELP) {
+            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
                 showSettingGroup();
             } else if (!isListOrSettingLayoutVisible()) {
                 switch (keyCode) {
