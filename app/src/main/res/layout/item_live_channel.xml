@@ -4,8 +4,8 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="8dp"
-    android:background="@drawable/item_bg_selector_right">
+    android:padding="12dp"
+    android:background="@drawable/bg_ku9_card">
 
     <TextView
         android:id="@+id/tvChannelNum"

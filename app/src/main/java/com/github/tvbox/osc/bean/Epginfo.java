@@ -51,11 +51,4 @@ public class Epginfo {
         datestart = Integer.parseInt(start.replace(":", ""));
         dateend = Integer.parseInt(end.replace(":", ""));
     }
-    public Date getDate() { return epgDate != null ? epgDate : startdateTime; }
-    public String getUrl() { return originStart != null ? originStart : ""; }
-    public String getTitle() { return title == null ? "" : title; }
-    public String getStartTime() { return start == null ? "" : start; }
-    public long getStartTimeL() { return startdateTime == null ? 0L : startdateTime.getTime(); }
-    public long getEndTimeL() { return enddateTime == null ? 0L : enddateTime.getTime(); }
-
 }

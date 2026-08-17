@@ -111,8 +111,6 @@ public class LiveEpgAdapter extends BaseQuickAdapter<Epginfo, BaseViewHolder> {
         notifyItemChanged(this.selectedEpgIndex);
 
     }
-    public void setSelectedIndex(int index) { setSelectedEpgIndex(index); }
-
     public int getSelectedIndex() {
         return selectedEpgIndex;
     }

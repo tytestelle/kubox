@@ -29,6 +29,9 @@ import android.widget.TextView;
 import android.app.AlertDialog;
 import android.widget.EditText;
 import android.widget.Toast;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.widget.ProgressBar;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -119,6 +122,23 @@ import xyz.doikki.videoplayer.player.VideoView;
 public class LivePlayActivity extends BaseActivity {
     public static Context context;
     private VideoView mVideoView;
+
+    // ========== 酷9手势与窗口 ==========
+    private View gestureOverlay;
+    private GestureDetector gestureDetector;
+    private LinearLayout llBottomInfoBar;
+    private ProgressBar epgProgressBar;
+    private TextView tvCurrentProgramName;
+    private TextView tvNextProgramName;
+    private boolean isBottomInfoBarShowing = false;
+    private static final float GESTURE_EDGE_RATIO = 0.18f;
+    private static final long BOTTOM_INFO_SHOW_DURATION = 5000L;
+    private final Runnable mHideBottomInfoRun = new Runnable() {
+        @Override
+        public void run() {
+            hideBottomInfoBar();
+        }
+    };
     private View switchChannelSnapshotOverlay;
     private ImageView switchChannelSnapshotImage;
     private TextView tvChannelInfo;
@@ -337,6 +357,14 @@ public class LivePlayActivity extends BaseActivity {
             iv_play = findViewById(R.id.iv_play);
             tvSelectedChannel = findViewById(R.id.tv_selected_channel);
 
+        // ========== 酷9手势与窗口初始化 ==========
+        gestureOverlay = findViewById(R.id.gesture_overlay);
+        llBottomInfoBar = findViewById(R.id.ll_bottom_info_bar);
+        epgProgressBar = findViewById(R.id.epg_progress_bar);
+        tvCurrentProgramName = findViewById(R.id.tv_current_program_name);
+        tvNextProgramName = findViewById(R.id.tv_next_program_name);
+        initGestureDetector();
+
             if (show) {
                 if (backcontroller != null) backcontroller.setVisibility(View.VISIBLE);
                 if (ll_epg != null) ll_epg.setVisibility(View.GONE);
@@ -426,11 +454,11 @@ public class LivePlayActivity extends BaseActivity {
 
         } catch (Exception e) {
             android.util.Log.e("LivePlayActivity", "init error", e);
-            // 直播页是本版本唯一的主界面；初始化异常时不要回到 TVBox 原来的首页。
-            Toast.makeText(this, "直播启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            if (tvLeftChannelListLayout != null) tvLeftChannelListLayout.setVisibility(View.INVISIBLE);
-            if (tvRightSettingLayout != null) tvRightSettingLayout.setVisibility(View.INVISIBLE);
-            if (ll_epg != null) ll_epg.setVisibility(View.VISIBLE);
+            Toast.makeText(this, "直播启动失败，进入主页: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(this, HomeActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            finish();
         }
     }
 
@@ -965,7 +993,11 @@ public class LivePlayActivity extends BaseActivity {
         }
         if (tv_right_top_channel_name != null) tv_right_top_channel_name.setText(channel_Name.getChannelName());
         if (tv_right_top_epg_name != null) tv_right_top_epg_name.setText(channel_Name.getChannelName());
+    
+        // 酷9：更新底部信息栏显示
+        updateBottomInfoBar();
     }
+
 
     private void setDefaultBottomEpg(TextView currentProgramName, TextView nextProgramName) {
         TimeZone timeZone = TimeZone.getTimeZone("GMT+8:00");
@@ -1063,6 +1095,10 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
+        if (isBottomInfoBarShowing) {
+            hideBottomInfoBar();
+            return;
+        }
         if (tvRightSettingLayout != null && tvRightSettingLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideSettingLayoutRun);
             mHandler.post(mHideSettingLayoutRun);
@@ -1077,6 +1113,7 @@ public class LivePlayActivity extends BaseActivity {
             backcontroller.setVisibility(View.GONE);
             return;
         }
+        // 酷9：返回键弹出设置面板
         showSettingGroup();
     }
 
@@ -1151,7 +1188,7 @@ public class LivePlayActivity extends BaseActivity {
                     return true;
                 }
             }
-            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO || keyCode == KeyEvent.KEYCODE_HELP || keyCode == KeyEvent.KEYCODE_SETTINGS) {
+            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO || keyCode == KeyEvent.KEYCODE_HELP) {
                 showSettingGroup();
             } else if (!isListOrSettingLayoutVisible()) {
                 switch (keyCode) {
@@ -1201,6 +1238,14 @@ public class LivePlayActivity extends BaseActivity {
                 if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) && event.getRepeatCount() == 0) {
                     showChannelList();
                 }
+            }
+        }
+
+        // 酷9：触摸/按键后显示底部信息栏
+        if (!isListOrSettingLayoutVisible() && !isBack && event.getAction() == KeyEvent.ACTION_UP) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                    || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                showBottomInfoBar();
             }
         }
         return super.dispatchKeyEvent(event);
@@ -1268,6 +1313,9 @@ public class LivePlayActivity extends BaseActivity {
     }
 
     private void showChannelList() {
+        // 酷9：显示频道列表时隐藏底部信息栏
+        hideBottomInfoBar();
+
         if (tvRightSettingLayout != null && tvRightSettingLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideSettingLayoutRun);
             mHandler.post(mHideSettingLayoutRun);
@@ -1816,6 +1864,9 @@ public class LivePlayActivity extends BaseActivity {
     }
 
     private void showSettingGroup() {
+        // 酷9：显示设置时隐藏底部信息栏
+        hideBottomInfoBar();
+
         if (tvLeftChannelListLayout != null && tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
             mHandler.removeCallbacks(mHideChannelListRun);
             mHandler.post(mHideChannelListRun);
@@ -3482,5 +3533,225 @@ public class LivePlayActivity extends BaseActivity {
 
     private interface OnInputConfirmListener {
         void onConfirm(String value);
+    }
+
+
+    // ========== 酷9手势与窗口方法 ==========
+
+    private void initGestureDetector() {
+        if (gestureOverlay == null) return;
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent e) {
+                handleSingleTap(e);
+                return true;
+            }
+            @Override
+            public void onLongPress(MotionEvent e) {
+                handleLongPress(e);
+            }
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                handleFling(e1, e2, velocityX, velocityY);
+                return true;
+            }
+            @Override
+            public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+                handleScroll(e1, e2, distanceX, distanceY);
+                return true;
+            }
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                // 双击切换播放/暂停
+                if (mVideoView != null) {
+                    if (mVideoView.isPlaying()) {
+                        mVideoView.pause();
+                    } else {
+                        mVideoView.start();
+                    }
+                }
+                return true;
+            }
+        });
+        gestureOverlay.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            return true;
+        });
+    }
+
+    private void handleSingleTap(MotionEvent e) {
+        if (e == null) return;
+        float x = e.getX();
+        float width = getResources().getDisplayMetrics().widthPixels;
+        float edge = width * GESTURE_EDGE_RATIO;
+
+        if (tvLeftChannelListLayout != null && tvLeftChannelListLayout.getVisibility() == View.VISIBLE) {
+            mHandler.removeCallbacks(mHideChannelListRun);
+            mHandler.post(mHideChannelListRun);
+            return;
+        }
+        if (tvRightSettingLayout != null && tvRightSettingLayout.getVisibility() == View.VISIBLE) {
+            mHandler.removeCallbacks(mHideSettingLayoutRun);
+            mHandler.post(mHideSettingLayoutRun);
+            return;
+        }
+
+        if (x < edge) {
+            // 左侧点击：显示频道列表
+            showChannelList();
+        } else if (x > width - edge) {
+            // 右侧点击：显示频道列表
+            showChannelList();
+        } else {
+            // 中间点击：切换底部信息栏
+            if (isBottomInfoBarShowing) {
+                hideBottomInfoBar();
+            } else {
+                showBottomInfoBar();
+            }
+        }
+    }
+
+    private void handleLongPress(MotionEvent e) {
+        if (e == null) return;
+        float x = e.getX();
+        float width = getResources().getDisplayMetrics().widthPixels;
+        float edge = width * GESTURE_EDGE_RATIO;
+
+        if (x > width - edge) {
+            // 右侧长按：设置
+            showSettingGroup();
+        } else if (x < edge) {
+            // 左侧长按：搜索（或显示EPG）
+            // 酷9左侧长按通常是搜索，这里用显示EPG替代
+            if (tvLeftChannelListLayout != null && tvLeftChannelListLayout.getVisibility() != View.VISIBLE) {
+                showChannelList();
+                mHandler.postDelayed(() -> {
+                    if (mLiveChannelView != null && mLiveChannelView.hasFocus()) {
+                        divLoadEpgRight(null);
+                    }
+                }, 300);
+            }
+        }
+    }
+
+    private void handleFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+        if (e1 == null || e2 == null) return;
+        float dx = e2.getX() - e1.getX();
+        float dy = e2.getY() - e1.getY();
+        float width = getResources().getDisplayMetrics().widthPixels;
+        float edge = width * GESTURE_EDGE_RATIO;
+        float absDx = Math.abs(dx);
+        float absDy = Math.abs(dy);
+
+        // 先判断是水平滑动还是垂直滑动
+        if (absDx > absDy * 1.5f) {
+            // 水平滑动：切换线路
+            if (dx > 80) {
+                // 向右滑：上一个线路
+                if (!isBack) playPreSource();
+            } else if (dx < -80) {
+                // 向左滑：下一个线路
+                if (!isBack) playNextSource();
+            }
+        } else if (absDy > absDx * 1.5f) {
+            // 垂直滑动
+            if (e1.getX() > width - edge) {
+                // 右侧上下滑：切换频道
+                if (dy > 50) {
+                    playPrevious();
+                } else if (dy < -50) {
+                    playNext();
+                }
+            } else if (e1.getX() < edge) {
+                // 左侧上下滑：音量（简化处理，实际需AudioManager）
+                // 这里用切换频道代替，或不做处理
+            }
+        }
+    }
+
+    private void handleScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        // Scroll主要用于连续操作，这里可以不做处理或用于音量
+    }
+
+    private void showBottomInfoBar() {
+        if (llBottomInfoBar == null || currentLiveChannelItem == null) return;
+        if (isListOrSettingLayoutVisible()) return;
+        if (backcontroller != null && backcontroller.getVisibility() == View.VISIBLE) return;
+
+        isBottomInfoBarShowing = true;
+        llBottomInfoBar.setVisibility(View.VISIBLE);
+        llBottomInfoBar.setAlpha(0f);
+        llBottomInfoBar.animate().alpha(1f).setDuration(200).start();
+
+        mHandler.removeCallbacks(mHideBottomInfoRun);
+        mHandler.postDelayed(mHideBottomInfoRun, BOTTOM_INFO_SHOW_DURATION);
+    }
+
+    private void hideBottomInfoBar() {
+        if (llBottomInfoBar == null) return;
+        isBottomInfoBarShowing = false;
+        llBottomInfoBar.animate().alpha(0f).setDuration(200).withEndAction(() -> {
+            if (!isBottomInfoBarShowing) llBottomInfoBar.setVisibility(View.GONE);
+        }).start();
+        mHandler.removeCallbacks(mHideBottomInfoRun);
+    }
+
+    @SuppressLint("SetTextI18n")
+    private void updateBottomInfoBar() {
+        if (llBottomInfoBar == null || currentLiveChannelItem == null) return;
+
+        // 频道号与名称
+        if (tv_channelnum != null) tv_channelnum.setText(String.valueOf(currentLiveChannelItem.getChannelNum()));
+        if (tip_chname != null) tip_chname.setText(currentLiveChannelItem.getChannelName());
+
+        // 当前/下一节目
+        if (tvCurrentProgramName != null) {
+            tvCurrentProgramName.setText(tip_epg1 != null ? tip_epg1.getText() : "");
+        }
+        if (tvNextProgramName != null) {
+            tvNextProgramName.setText(tip_epg2 != null ? tip_epg2.getText() : "");
+        }
+
+        // 来源信息
+        if (tv_srcinfo != null) {
+            if (currentLiveChannelItem.getSourceNum() <= 0) {
+                tv_srcinfo.setText("1/1");
+            } else {
+                tv_srcinfo.setText("线路" + (currentLiveChannelItem.getSourceIndex() + 1) + "/" + currentLiveChannelItem.getSourceNum());
+            }
+        }
+
+        // 台标
+        updateCurrentChannelIcon();
+
+        // EPG进度条
+        updateEpgProgress();
+    }
+
+    private void updateEpgProgress() {
+        if (epgProgressBar == null || channel_Name == null || liveEpgDateAdapter == null) return;
+        String savedEpgKey = channel_Name.getChannelName() + "_" + Objects.requireNonNull(liveEpgDateAdapter.getItem(liveEpgDateAdapter.getSelectedIndex())).getDatePresented();
+        if (!hsEpg.containsKey(savedEpgKey)) {
+            epgProgressBar.setProgress(0);
+            return;
+        }
+        ArrayList<Epginfo> arrayList = hsEpg.get(savedEpgKey);
+        if (arrayList == null || arrayList.isEmpty()) {
+            epgProgressBar.setProgress(0);
+            return;
+        }
+        Date now = new Date();
+        for (Epginfo epg : arrayList) {
+            if (epg != null && epg.startdateTime != null && epg.enddateTime != null
+                    && now.after(epg.startdateTime) && now.before(epg.enddateTime)) {
+                long total = epg.enddateTime.getTime() - epg.startdateTime.getTime();
+                long current = now.getTime() - epg.startdateTime.getTime();
+                int progress = total > 0 ? (int) (current * 100 / total) : 0;
+                epgProgressBar.setProgress(Math.max(0, Math.min(100, progress)));
+                return;
+            }
+        }
+        epgProgressBar.setProgress(0);
     }
 }
