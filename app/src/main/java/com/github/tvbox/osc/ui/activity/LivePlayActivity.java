@@ -273,7 +273,7 @@ public class LivePlayActivity extends BaseActivity {
     private void initInternal() {
         context = this;
         // ========== 修复2: Hawk.get 做空值防护 ==========
-        String rawEpg = Hawk.get(HawkConfig.EPG_URL, "https://epg.v1.mk/fy.xml");
+        String rawEpg = Hawk.get(HawkConfig.EPG_URL, "");
         epgString = rawEpg != null ? rawEpg : "";
 
         setLoadSir(findViewById(R.id.live_root));
@@ -367,13 +367,11 @@ public class LivePlayActivity extends BaseActivity {
         initLiveChannelList();
         initLiveSettingList();
 
-        // 酷9式启动：直播页直接读取已保存的直播订阅；若没有单独直播地址，
-        // ApiConfig.loadLiveConfig() 会兼容使用 TVBox 原有 API_URL。
+        // 如果没有通过点播配置自动带入直播源，则按酷9的订阅地址直接加载。
         if (ApiConfig.get().getChannelGroupList() == null || ApiConfig.get().getChannelGroupList().isEmpty()) {
-            final String liveUrl = Hawk.get(HawkConfig.LIVE_API_URL, "");
-            final String apiUrl = Hawk.get(HawkConfig.API_URL, "");
-            if (!TextUtils.isEmpty(liveUrl) || !TextUtils.isEmpty(apiUrl)) {
-                debugLog("LIVE_AUTO_LOAD: " + (!TextUtils.isEmpty(liveUrl) ? liveUrl : apiUrl));
+            String liveUrl = Hawk.get(HawkConfig.LIVE_API_URL, "");
+            if (!TextUtils.isEmpty(liveUrl)) {
+                debugLog("LIVE_AUTO_LOAD: " + liveUrl);
                 ApiConfig.get().loadLiveConfig(true, new ApiConfig.LoadConfigCallback() {
                     @Override public void success() {
                         runOnUiThread(() -> {
@@ -582,6 +580,17 @@ public class LivePlayActivity extends BaseActivity {
             return true;
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        // 不让播放器/父布局在 BACK 的 ACTION_UP 阶段再次处理返回键，
+        // 否则部分电视 ROM 会直接 finish Activity，导致 KU9 菜单刚打开就消失。
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            debugLog("KU9_BACK_ON_KEYUP_CONSUMED");
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     @Override
@@ -1016,12 +1025,11 @@ public class LivePlayActivity extends BaseActivity {
         liveChannelGroupList.addAll(list);
         liveChannelGroupAdapter.setNewData(liveChannelGroupList);
 
-        // 首次进入必须真正加载第一个分组并自动播放第一个频道。
-        // 原代码 currentChannelGroupIndex 默认 0，导致 selectChannelGroup(0)
-        // 直接命中“同组 return”，出现“进入直播但不播放”的假死。
-        currentChannelGroupIndex = -1;
-        currentLiveChannelIndex = -1;
-        selectChannelGroup(0, false, 0);
+        if (currentChannelGroupIndex > -1) {
+            selectChannelGroup(currentChannelGroupIndex, false, currentLiveChannelIndex);
+        } else {
+            selectChannelGroup(0, false, -1);
+        }
     }
 
     private void initLiveSettingList() {
@@ -1173,7 +1181,13 @@ public class LivePlayActivity extends BaseActivity {
         tv_right_top_epg_name.setText("精彩节目-暂未提供节目预告信息");
         tv_right_top_epg_name.getPaint().setFakeBoldText(true);
 
-        // 酷9台标：使用内置 epg_data.json 映射。
+        // ========== EPG 修复: 加载台标 ==========
+        loadChannelLogo(liveChannelItem.getChannelName());
+
+        // ========== EPG 修复: 加载台标（使用 epg_data.json 映射） ==========
+        loadChannelLogo(liveChannelItem.getChannelName());
+
+        // ========== 修复5: 加载台标（使用 epg_data.json 映射） ==========
         loadChannelLogo(liveChannelItem.getChannelName());
 
         if (mVideoView != null) {
@@ -1212,7 +1226,7 @@ public class LivePlayActivity extends BaseActivity {
                     mainHandler.post(() -> updateEpgUI(channelName, epgList));
                 } else {
                     // 数据库没有，尝试从网络加载
-                    String epgUrl = Hawk.get(HawkConfig.EPG_URL, "https://epg.v1.mk/fy.xml");
+                    String epgUrl = Hawk.get(HawkConfig.EPG_URL, "");
                     if (epgUrl != null && !epgUrl.isEmpty() && !"默认".equals(epgUrl)) {
                         EpgDataManager.getInstance(LivePlayActivity.this).loadEpgData(epgUrl, new EpgDataManager.EpgDataCallback() {
                             @Override
