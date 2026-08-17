@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <attr name="fontPath" format="string" />
+    <attr name="color_theme" format="color|reference" />
     <attr name="textFieldStyle" format="reference" />
     <declare-styleable name="lbBaseGridView">
         <attr name="focusOutFront" format="boolean" />
