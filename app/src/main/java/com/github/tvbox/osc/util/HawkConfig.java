@@ -12,13 +12,15 @@ public class HawkConfig {
     public static final String LIVE_CHANNEL_REVERSE = "live_channel_reverse";
     public static final String LIVE_CROSS_GROUP = "live_cross_group";
     public static final String LIVE_CONNECT_TIMEOUT = "live_connect_timeout";
+    public static final String LIVE_CONNECT_TIMEOUT_CHANGE_SOURCE = "live_connect_timeout_change_source";
     public static final String LIVE_SHOW_NET_SPEED = "live_show_net_speed";
     public static final String LIVE_SHOW_RESOLUTION = "live_show_resolution";
     public static final String LIVE_SHOW_TIME = "live_show_time";
     public static final String LIVE_GROUP_INDEX = "live_group_index";
     public static final String LIVE_GROUP_LIST = "live_group_list";
     public static final String LIVE_API_URL = "live_api_url";        // 直播订阅地址
-    public static final String LIVE_API_HISTORY = "live_api_history"; // 直播订阅历史
+    public static final String LIVE_API_HISTORY = "live_api_history";
+    public static final String LIVE_API_SUBSCRIPTIONS = "live_api_subscriptions"; // 直播订阅历史
     public static final String LIVE_WEB_HEADER = "live_web_header";
     public static final String DEFAULT_LOAD_LIVE = "DEFAULT_LOAD_LIVE";
     public static final String LIVE_PLAY_TYPE = "live_play_type";    // 0 系统 1 ijk 2 exo 10 MXPlayer

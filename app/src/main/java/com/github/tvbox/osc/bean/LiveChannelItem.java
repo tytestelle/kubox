@@ -182,6 +182,8 @@ public class LiveChannelItem {
         return headers;
     }
 
+    public ArrayList<String> getChannelSourceUrls() { return channelUrls; }
+
     public ArrayList<String> getChannelUrls() {
         return channelUrls;
     }

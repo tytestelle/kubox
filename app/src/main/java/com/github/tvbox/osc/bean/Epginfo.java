@@ -7,10 +7,16 @@ import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Date;
 import java.util.TimeZone;
 
 public class Epginfo {
+
+    // Compatibility fields for the database/XML EPG pipeline.
+    private String name;
+    private List<EpgProgram> program = new ArrayList<>();
+    private String url = "";
 
     public Date startdateTime;
     public Date enddateTime;
@@ -25,6 +31,10 @@ public class Epginfo {
     public Date epgDate;
     public String currentEpgDate = null;
     SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+    public Epginfo() {
+        // Used by the XML/JSON EPG parser.
+    }
 
     public Epginfo(Date Date,String str, Date date, String str1, String str2,int pos) {
         epgDate = Date;
@@ -51,4 +61,17 @@ public class Epginfo {
         datestart = Integer.parseInt(start.replace(":", ""));
         dateend = Integer.parseInt(end.replace(":", ""));
     }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public List<EpgProgram> getProgram() { return program; }
+    public void setProgram(List<EpgProgram> program) { this.program = program != null ? program : new ArrayList<EpgProgram>(); }
+    public Date getDate() { return startdateTime != null ? startdateTime : epgDate; }
+    public void setDate(Date date) { this.epgDate = date; this.startdateTime = date; }
+    public String getUrl() { return url == null ? "" : url; }
+    public void setUrl(String url) { this.url = url; }
+    public String getStartTime() { return start == null ? "" : start; }
+    public String getTitle() { return title == null ? "" : title; }
+    public long getStartTimeL() { return startdateTime == null ? 0L : startdateTime.getTime(); }
+    public long getEndTimeL() { return enddateTime == null ? 0L : enddateTime.getTime(); }
 }

@@ -60,6 +60,18 @@ public class LiveSettingItemAdapter extends BaseQuickAdapter<LiveSettingItem, Ba
             notifyItemChanged(this.focusedItemIndex);
     }
 
+    public void setSelectedItemIndex(int selectedItemIndex) {
+        int previous = getSelectedItemIndex();
+        if (previous >= 0 && previous < getData().size()) {
+            getData().get(previous).setItemSelected(false);
+            notifyItemChanged(previous);
+        }
+        if (selectedItemIndex >= 0 && selectedItemIndex < getData().size()) {
+            getData().get(selectedItemIndex).setItemSelected(true);
+            notifyItemChanged(selectedItemIndex);
+        }
+    }
+
     public int getSelectedItemIndex() {
         for (LiveSettingItem item : getData()) {
             if (item.isItemSelected())

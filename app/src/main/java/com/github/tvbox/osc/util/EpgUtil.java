@@ -44,6 +44,17 @@ public class EpgUtil {
     private static final Map<String, ArrayList<com.github.tvbox.osc.bean.Epginfo>> epgMemCache = new HashMap<>();
     private static final int MAX_EPG_CACHE = 50;
 
+    public static String getCurrentProgram(List<Epginfo> list) {
+        if (list == null || list.isEmpty()) return "";
+        long now = System.currentTimeMillis();
+        for (Epginfo info : list) {
+            if (info != null && info.getStartTimeL() <= now && info.getEndTimeL() >= now) {
+                return info.getTitle();
+            }
+        }
+        return list.get(0) != null ? list.get(0).getTitle() : "";
+    }
+
     public static void init() {
         new Thread(() -> {
             loadEpgData();      // 导入JSON到数据库

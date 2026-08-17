@@ -20,6 +20,10 @@ import java.util.Hashtable;
 
 public class EpgNameFuzzyMatch {
 
+    private static final EpgNameFuzzyMatch INSTANCE = new EpgNameFuzzyMatch();
+
+    public static EpgNameFuzzyMatch getInstance() { return INSTANCE; }
+
     private static JsonObject epgNameDoc = null;
     private static Hashtable hsEpgName = new Hashtable();
 
@@ -107,6 +111,14 @@ public class EpgNameFuzzyMatch {
     }
 
 
-
+    public String getMappedName(String channelName) {
+        if (channelName == null || channelName.trim().isEmpty()) return null;
+        JsonObject obj = getEpgNameInfo(channelName.trim());
+        if (obj == null || !obj.has("name")) return null;
+        String names = obj.get("name").getAsString();
+        String[] aliases = names.split(",");
+        return aliases.length > 0 ? aliases[0].trim() : null;
+    }
 
 }
+
