@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.EpgChannel;
 import com.github.tvbox.osc.bean.EpgData;
+import com.github.tvbox.osc.bean.Epginfo;
 import com.github.tvbox.osc.cache.EpgChannelDao;
 import com.github.tvbox.osc.cache.EpgDataDao;
 import com.github.tvbox.osc.data.AppDataManager;
